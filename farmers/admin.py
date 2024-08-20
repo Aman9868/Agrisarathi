@@ -1,0 +1,369 @@
+from django.contrib import admin
+from .models import *
+from django.utils.html import format_html
+
+#########################---------------------Languages-----------------------##########
+@admin.register(LanguageSelection)
+class LangaugeSelectionAdmin(admin.ModelAdmin):
+    list_display=('id','language','created_at')
+
+#########################-------------------------State Master--------------------------##################
+@admin.register(StateMaster)
+class StateMasterAdmin(admin.ModelAdmin):
+    list_display = ('id','state', 'getlanguage')
+    def getlanguage(self,obj):
+        return obj.fk_language.language if obj.fk_language else None
+    getlanguage.short_description='Language'
+#########################----------------------------Distict Master-------------------------#############
+@admin.register(DistrictMaster)
+class DistrictMasterAdmin(admin.ModelAdmin):
+    list_display=('id','getstate','district','getlanguage','created_at')
+    def getstate(self,obj):
+        return obj.fk_state.state if obj.fk_state else None
+    getstate.short_description='State'
+    def getlanguage(self,obj):
+        return obj.fk_language.language if obj.fk_language else None
+    getlanguage.short_description='Language'
+
+#########################----------------------Farmers------------------------###################
+@admin.register(FarmerProfile)
+class FarmerofileAdmin(admin.ModelAdmin):
+    list_display = ('id','name', 'mobile_no', 'getlanguage','display_badgecolor','coins','fpo_name','created_at','updated_at')
+    def display_badgecolor(self, obj):
+        if obj.badgecolor:
+            return format_html('<a href="{}" target="_blank"><img src="{}" width="100px" /></a>',  obj.badgecolor.url,obj.badgecolor.url)
+        else:
+            return '-'
+    display_badgecolor.short_description = 'Badge Color'
+
+    def getlanguage(self,obj):
+        return obj.fk_language.language if obj.fk_language else None
+    getlanguage.short_description='Language'
+
+
+    def save_model(self, request, obj, form, change):
+        if 'coins' in form.changed_data:
+            obj.add_coins(form.cleaned_data['coins'])
+        super().save_model(request, obj, form, change)
+@admin.register(FarmerLandAddress)
+class FarmerLandAddressAdmin(admin.ModelAdmin):
+    list_display = ('id','fk_farmer', 'land_area', 'address','getcrop_name','pincode', 'get_state', 'get_district', 'village', 'lat1', 'lat2',
+                    'tehsil')
+    def getcrop_name(self,obj):
+        return obj.fk_crops.crop_name if obj.fk_crops else None
+    getcrop_name.short_description = 'Crop Name'
+    def get_state(self,obj):
+        return obj.fk_state.state if obj.fk_state else None
+    get_state.short_description='State'
+    def get_district(self,obj):
+        return obj.fk_district.district if obj.fk_district else None
+    get_district.short_description='District'
+#############------------------------------------------Fertilizers Admin---------------------------####################
+@admin.register(Fertilizer)
+class FertilizerAdmin(admin.ModelAdmin):
+    list_display = ('get_state', 'fk_language', 'nitrogen', 'phosphorus', 'potassium', 'zincsulphate', 'measurement_type')
+    search_fields = ('fk_state__state', 'fk_language__language')  
+    list_filter = ('measurement_type',)
+    def get_state(self,obj):
+        return obj.fk_state.state if obj.fk_state else None
+    get_state.short_description='State'
+################---------------------------------------Service Providers----------------------------###################################
+@admin.register(Service_Provider)
+class Service_ProviderAdmin(admin.ModelAdmin):
+    list_display = ('id','name', 'display_service', 'created_dt','paid_or_free','getlanguage')
+    def display_service(self, obj):
+
+        if obj.service_provider_pic:
+            return format_html('<a href="{}" target="_blank"><img src="{}" width="100px" /></a>', obj.service_provider_pic.url, obj.service_provider_pic.url)
+        else:
+            return '-'
+    display_service.short_description = 'Service Provider'
+    def getlanguage(self,obj):
+        return obj.fk_language.language if obj.fk_language else None
+    getlanguage.short_description='Language'
+#########################----------------------------------Disease Section Admin-----------------------------------##################
+@admin.register(DiseaseMaster)
+class DiseaseMasterAdmin(admin.ModelAdmin):
+    list_display = ('id','name','symptom','treatmentbefore','treatmentfield','getlanguage')
+    list_filter=('fk_crops','fk_language')
+    def getlanguage(self,obj):
+        return obj.fk_language.language if obj.fk_language else None
+    getlanguage.short_description='Language'
+
+@admin.register(Disease_Images_Master)
+class Disease_Images_MasterAdmin(admin.ModelAdmin):
+    list_display = ('id','get_fk_disease', 'disease_file')
+    
+    def get_fk_disease(self, obj):
+        return ", ".join([disease.name for disease in obj.fk_disease.all()])
+    get_fk_disease.short_description = 'Diseases'
+
+@admin.register(DiseaseTranslation)
+class DiseaseTranslationAdmin(admin.ModelAdmin):
+    list_display=('id','getdisease_name','getlanguage','translation','fk_crops')
+    def getlanguage(self,obj):
+        return obj.fk_language.language if obj.fk_language else None
+    getlanguage.short_description='Language'
+
+    def getdisease_name(self,obj):
+        return obj.fk_disease.name if obj.fk_disease else None
+    
+################-----------------------------------------------Disease Video------------------------#############
+@admin.register(DiseaseVideo)
+class DiseaseVideoAdmin(admin.ModelAdmin):
+    list_display=('fk_language','video')
+    
+################-----------------------------------------Govt Schemes-------------------######################
+@admin.register(GovtSchemes)
+class GovtSchemesAdmin(admin.ModelAdmin):
+    list_display = ('scheme_name','scheme_by','getlanguage','display_links','display_image')
+    def getlanguage(self,obj):
+        return obj.fk_language.language if obj.fk_language else None
+    getlanguage.short_description='Language'
+
+    def getstate(self,obj):
+        return obj.fk_state.state if obj.fk_state else None
+    getstate.short_description='State'
+
+    def display_links(self, obj):
+        if obj.reference:
+            links = obj.reference.split('\n')
+            return '\n'.join(links)
+        return ""
+    def display_image(self, obj):
+        if obj.scheme_image:
+            return format_html('<a href="{}" target="_blank"><img src="{}" width="100px" /></a>', obj.scheme_image.url, obj.scheme_image.url)
+        else:
+            return '-'
+    display_image.short_description = 'Image'
+
+#####################################----------------------------CROP & Seasons---------------#####################
+@admin.register(SeasonMaster)
+class SeasonMasterAdmin(admin.ModelAdmin):
+    list_display = ('id','season','getlanguage')
+    def getlanguage(self,obj):
+        return obj.fk_language.language if obj.fk_language else None
+    getlanguage.short_description='Language'
+
+@admin.register(CropTypeMaster)
+class CropTypeMasterAdmin(admin.ModelAdmin):
+    list_display = ('id','get_season', 'type','getlanguage')
+    def get_season(self, obj):
+        return obj.fk_season.season if obj.fk_season else None
+    get_season.short_description = 'Season'
+    get_season.admin_order_field = 'fk_season__season'
+    def getlanguage(self,obj):
+        return obj.fk_language.language if obj.fk_language else None
+    getlanguage.short_description='Language'
+
+@admin.register(CropMaster)
+class CropMasterAdmin(admin.ModelAdmin):
+    list_display = ('id','get_crop_type', 'crop_name','getlanguage','fk_poptype')
+    list_filter=('fk_language',)
+
+    def get_crop_type(self, obj):
+        return obj.fk_crop_type.type if obj.fk_crop_type else None
+    get_crop_type.short_description = 'Crop Type'
+    get_crop_type.admin_order_field = 'fk_crop_type__type'
+
+    def getlanguage(self,obj):
+        return obj.fk_language.language if obj.fk_language else None
+    getlanguage.short_description='Language'
+
+
+@admin.register(CropImages)
+class CropImagesAdmin(admin.ModelAdmin):
+    list_display=('id','get_crop','crop_image')
+    def get_crop(self, obj):
+        return ", ".join([disease.crop_name for disease in obj.fk_cropmaster.all()])
+    get_crop.short_description = 'Crop Name'
+
+###########################################----------------------Crop Variety---------------------------------------#################
+@admin.register(CropVariety)
+class CropVarietyAdmin(admin.ModelAdmin):
+    list_display=('id','getcrop_name','variety')
+    search_fields=('variety',)
+    def getcrop_name(self,obj):
+        return obj.fk_crops.crop_name if obj.fk_crops else None
+    getcrop_name.short_description = 'Crop Name'
+#############--------------------------------------------Community Section---------------------##################### 
+@admin.register(CommunityPost)
+class CommunityPostAdmin(admin.ModelAdmin):
+    list_display = ('get_user_name','display_fponame', 'description', 'created_dt')
+
+    def get_user_name(self, obj):
+        return obj.fk_user.name if obj.fk_user else None
+    get_user_name.short_description = 'Posted by Farmer'
+    get_user_name.admin_order_field = 'fk_user__name'
+    def display_fponame(self,obj):
+        return obj.fk_fpo.fpo_name if obj.fk_fpo else None
+    display_fponame.short_description ="Posted By FPO"
+    def get_crop_name(self, obj):
+        return obj.fk_crop.crop_name if obj.fk_crop else None
+    get_crop_name.short_description = 'Crop Name'
+    get_crop_name.admin_order_field = 'fk_crop__crop_name'
+
+@admin.register(PostsMedia)
+class PostsMediaAdmin(admin.ModelAdmin):
+    list_display = ('fk_post', 'video_file', 'image_file')
+
+@admin.register(PostComments)
+class PostCommentsAdmin(admin.ModelAdmin):
+    list_display = ('fk_post', 'get_user_name','display_fponame','text', 'created_dt')
+    def get_user_name(self, obj):
+        return obj.fk_user.name if obj.fk_user else None
+    get_user_name.short_description = 'Commented by Farmer'
+    get_user_name.admin_order_field = 'fk_user__name'
+    def display_fponame(self,obj):
+        return obj.fk_fpo.fpo_name if obj.fk_fpo else None
+    display_fponame.short_description ="Commented By FPO"
+
+@admin.register(CommentReply)
+class CommentReplyAdmin(admin.ModelAdmin):
+    list_display = ('display_postcomment', 'displayfarmer_name','display_fponame','text', 'created_dt')
+
+    def display_postcomment(self,obj):
+        return obj.fk_postcomment.text if obj.fk_postcomment else None
+    display_postcomment.short_description = "Comment"
+
+    def displayfarmer_name(self,obj):
+        return obj.fk_user.name if obj.fk_user else None
+    displayfarmer_name.short_description = "Reply by Farmer"
+
+    def display_fponame(self,obj):
+        return obj.fk_fpo.fpo_name if obj.fk_fpo else None
+    display_fponame.short_description ="Reply By FPO"
+    
+
+@admin.register(PostsLike)
+class PostsLikeAdmin(admin.ModelAdmin):
+    list_display = ('fk_post', 'fk_user','fk_fpo','like_count', 'created_dt')
+    def display_post(self,obj):
+        return obj.fk_post.description if obj.fk_post else None
+    
+#######################--------------------------------------Upload Diseasees--------------------------#################
+@admin.register(Upload_Disease)
+class Uploaded_DiseaseAdmin(admin.ModelAdmin):
+    list_display = ('id','get_service_provider', 'get_crop_name','get_disease_name','get_user','fk_language','state','district'
+                    )
+
+    def get_user(self, obj):
+        return obj.fk_User.id if obj.fk_User else None
+    get_user.short_description = 'User'
+
+    def get_service_provider(self, obj):
+        return obj.fk_provider.name if obj.fk_provider else None
+    get_service_provider.short_description = 'Service Provider'
+    get_service_provider.admin_order_field = 'fk_provider__name'
+
+    def get_crop_name(self, obj):
+        return obj.fk_crop.crop_name if obj.fk_crop else None
+    get_crop_name.short_description = 'Crop Name'
+    get_crop_name.admin_order_field = 'fk_crop__crop_name'
+
+    def get_disease_name(self, obj):
+
+        return obj.fk_disease.name if obj.fk_disease else None
+    get_disease_name.short_description = 'Disease Name'
+    get_disease_name.admin_order_field = 'fk_disease__name'
+######################----------------------------------Soil Tseting------------------############################
+@admin.register(SoilCharges)
+class SoilAdminCharges(admin.ModelAdmin):
+    list_display = ('id', 'price', 'plans','fk_shop')
+    def get_service_provider(self, obj):
+        return obj.fk_providername.name if obj.fk_providername else None
+    get_service_provider.short_description = 'Service Provider'
+    get_service_provider.admin_order_field = 'fk_provider__name'
+
+
+##################----------------------------------Vegetable POP-----------------------############
+@admin.register(VegetablePop)
+class VegetablePopAdmin(admin.ModelAdmin):
+    list_display = ('stages','description','stage_number', 'get_crop_name','audio','preference','video')
+    list_filter = ('stages','fk_language','fk_crop')
+    search_fields = ('stages', 'description')
+    def get_crop_name(self, obj):
+        return obj.fk_crop.crop_name if obj.fk_crop else None
+    get_crop_name.short_description = 'Crop Name'
+
+    def getlanguage(self,obj):
+        return obj.fk_language.language if obj.fk_language else None
+    getlanguage.short_description='Language'
+
+##################################----------------------Spices POP------------------------##################
+@admin.register(SpicesPop)
+class SpicesPopAdmin(admin.ModelAdmin):
+    list_display = ('stages','description','stage_number','getcrop_type', 'get_crop_name','getlanguage','preference')
+    list_filter = ('stages','fk_language')
+    search_fields = ('stages', 'description')
+    def get_crop_name(self, obj):
+        return obj.fk_crop.crop_name if obj.fk_crop else None
+    get_crop_name.short_description = 'Crop Name'
+
+    def getlanguage(self,obj):
+        return obj.fk_language.language if obj.fk_language else None
+    getlanguage.short_description='Language'
+
+    def getcrop_type(self,obj):
+        return obj.fk_croptype.name if obj.fk_croptype else None
+
+
+###############################----------------------Stages Completion--------------------##########################
+@admin.register(VegetableStageCompletion)
+class VegtableStageCompletionAdmin(admin.ModelAdmin):
+    list_display = ('vegetable_pop', 'stage_number', 'fk_farmer', 'completion_date', 'total_days_spent', 'delay_days')
+
+@admin.register(SpicestageCompletion)
+class SpicestageCompletionAdmin(admin.ModelAdmin):
+    list_display = ('spice_pop', 'stage_number', 'fk_farmer', 'completion_date', 'total_days_spent', 'delay_days')
+#################################-------------------------Prefrence Completion------------------###################
+@admin.register(VegetablePreferenceCompletion)
+class VegetablePreferenceCompletionAdmin(admin.ModelAdmin):
+    list_display = ('fk_farmer', 'fk_crop', 'preference_number', 'start_date', 'completion_date', 'total_days', 'is_completed')
+
+@admin.register(SpicesPreferenceCompletion)
+class SpicesPreferenceCompletionAdmin(admin.ModelAdmin):
+    list_display = ('fk_farmer', 'fk_crop', 'preference_number', 'start_date', 'completion_date', 'total_days', 'is_completed')
+
+#################################------------------------------Fruits POP-----------------------------####################
+@admin.register(FruitsPop)
+class FruitsPopAdmin(admin.ModelAdmin):
+    list_display = ['id','stages','stage_name', 'stage_number', 'start_period', 'end_period', 'orchidtype',
+                    'getlanguage','getcrop_name']
+    def getcrop_name(self,obj):
+        return obj.fk_crops.crop_name if obj.fk_crops else None
+    getcrop_name.short_description = 'Crop Name'
+
+    def getlanguage(self,obj):
+        return obj.fk_language.language if obj.fk_language else None
+    getlanguage.short_description='Language'
+
+
+@admin.register(FruitsStageCompletion)
+class FruitsStageComplete(admin.ModelAdmin):
+    list_display=('fk_fruits','fk_farmer','fk_farmland','start_date','completion_date','days_completed','delay_count')
+
+################################-----------------------------POP Notifcation---------------------------#############
+@admin.register(PopWeatherCondition)
+class PopWeatherConditionAdmin(admin.ModelAdmin):
+    list_display=('id','condition')
+
+@admin.register(WeatherPopNotification)
+class WeatherPopNotificationAdmin(admin.ModelAdmin):
+    list_display=('stages','getcrop_name','notification_text','getlanguage','gif')
+    list_filter=('fk_crops',)
+    def getcrop_name(self,obj):
+        return obj.fk_crops.crop_name if obj.fk_crops else None
+    getcrop_name.short_description = 'Crop Name'
+
+    def getlanguage(self,obj):
+        return obj.fk_language.language if obj.fk_language else None
+    getlanguage.short_description='Language'
+
+################################------------------------------Crop Suggestion----------------#####################
+@admin.register(SuggestedCrop)
+class SuggestedCropAdmin(admin.ModelAdmin):
+    list_display = ('season', 'start_month', 'end_month', 'weather_temperature', 'cost_of_cultivation', 'market_price', 'production', 'getcrop_name', 'fk_language')
+    def getcrop_name(self,obj):
+        return obj.fk_crop.crop_name if obj.fk_crop else None
+    getcrop_name.short_description = 'Crop Name'
