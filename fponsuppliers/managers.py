@@ -36,7 +36,8 @@ def validate_mobile_no(value):
 
 class CustomUser(AbstractUser, PermissionsMixin):
     username = models.CharField(max_length=150, unique=True, null=True, blank=True)
-    email = None
+    email=models.EmailField(max_length=255,null=True, blank=True)
+    email_verified=models.BooleanField(null=True,blank=True,default="False")
     first_name = None
     last_name = None
     mobile = models.CharField(max_length=10, validators=[validate_mobile_no])

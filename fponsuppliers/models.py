@@ -7,6 +7,7 @@ from django.contrib.auth.hashers import make_password, check_password
 import re
 from django.apps import apps
 from datetime import datetime
+import os
 from .managers import *
 def validate_mobile_no(value):
     if not re.match(r'^\d{10}$', value):
@@ -16,6 +17,8 @@ def validate_mobile_no(value):
 ##################-------------------------------Supplier----------------------------------##################
 class Supplier(models.Model):
     user = models.OneToOneField(CustomUser, on_delete=models.CASCADE, related_name='supplier')
+    email=models.EmailField(max_length=255,null=True, blank=True)
+    email_verified=models.BooleanField(null=True,blank=True,default="False")
     mobile = models.CharField(null=True, blank=True, max_length=10, validators=[validate_mobile_no], unique=True)
     profile = models.FileField(upload_to="shop/supplier_profile", blank=True, null=True)
     supplier_name=models.CharField(max_length=100,null=True, blank=True)
@@ -39,6 +42,8 @@ class Supplier(models.Model):
 ##################--------------------------FPO---------------------------------#########################
 class FPO(models.Model):
     user = models.OneToOneField(CustomUser, on_delete=models.CASCADE, related_name='fpo')
+    email=models.EmailField(max_length=255,null=True, blank=True)
+    email_verified=models.BooleanField(null=True,blank=True,default="False")
     mobile = models.CharField(null=True, blank=True, max_length=10, validators=[validate_mobile_no], unique=True)
     fpo_name=models.CharField(max_length=100,null=True, blank=True)
     email = models.EmailField(null=True,blank=True)
@@ -53,8 +58,31 @@ class FPO(models.Model):
     ip_address = models.GenericIPAddressField(null=True, blank=True)
     is_active = models.BooleanField(default=True)
     is_deleted = models.BooleanField(default=False)
+    coins = models.IntegerField(null=True, blank=True, default=0)
     created_by = models.ForeignKey(CustomUser, related_name='fpo_created_by', null=True, blank=True, on_delete=models.SET_NULL)
     last_updated_by = models.ForeignKey(CustomUser, related_name='fpo_last_updated_by', null=True, blank=True, on_delete=models.SET_NULL)
+    badgecolor = models.ImageField(upload_to="fpo_badges/", null=True, blank=True)
+    BADGE_CHOICES = {
+        'white': 'badge-white.png',
+        'yellow': 'badge-yellow.png',
+        'red': 'badge-red.jpg',
+        'blue': 'badge-blue.jpg',
+        'green': 'badge-green.jpg'
+    }
+
+    def updatefpoBadgeColor(self, coinCount):
+        if coinCount == 0:
+            return None
+        badges = {'white': 100, 'yellow': 500, "red": 1000, "blue": 1500, "green": 200000000000}
+        for color, threshold in badges.items():
+            if coinCount < threshold:
+                return os.path.join('badges/', self.BADGE_CHOICES[color])
+        return os.path.join('badges/', self.BADGE_CHOICES['green'])  
+
+    def addfpo_coins(self, amount):
+        self.coins += amount
+        self.badgecolor = self.updatefpoBadgeColor(self.coins)
+        self.save()
     def set_password(self, raw_password):
         self.password = make_password(raw_password)
 

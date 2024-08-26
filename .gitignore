@@ -11,7 +11,7 @@ __pycache__/
 .nohup.out
 media/
 static/
-
+backup.sql
 .idea/
 nohup.out
 static/

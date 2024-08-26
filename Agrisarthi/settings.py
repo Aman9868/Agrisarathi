@@ -98,17 +98,18 @@ DATABASES = {
         'PASSWORD': os.getenv('DB_PASSWORD', 'root'),
         'HOST': os.getenv('DB_HOST', 'localhost'),
         'PORT': os.getenv('DB_PORT', '3306'),
-    },
-    'replica': {
-        'ENGINE': 'django.db.backends.mysql',
-        'NAME': os.getenv('DB_NAME', 'agrisarathireplica'),
-        'USER': os.getenv('DB_USER', 'root'),
-        'PASSWORD': 'replica_password',
-        'HOST': os.getenv('DB_PASSWORD', 'root'),
-        'PORT':  os.getenv('DB_PORT', '3306'),
     }
+    #'slave': {
+    #    'ENGINE': 'django.db.backends.mysql',
+    #    'NAME': os.getenv('DB_NAME', 'agrisarathireplica'),
+    #    'USER': os.getenv('DB_USER', 'root'),
+    #    'PASSWORD': os.getenv('DB_PASSWORD', 'root'),
+    #    'HOST': os.getenv('DB_HOST', 'localhost'),
+    #    'PORT': os.getenv('DB_PORT', '3306'),
+    #},
 }
 
+#DATABASE_ROUTERS = ['Agrisarthi.routers.MasterSlaveRouter']
 
 
 # Password validation
@@ -171,8 +172,8 @@ REST_FRAMEWORK = {
 }
 
 SIMPLE_JWT = {
-    'ACCESS_TOKEN_LIFETIME': datetime.timedelta(minutes=60),
-    'REFRESH_TOKEN_LIFETIME': datetime.timedelta(days=1),
+    'ACCESS_TOKEN_LIFETIME': datetime.timedelta(days=10),
+    'REFRESH_TOKEN_LIFETIME': datetime.timedelta(days=12),
     'ROTATE_REFRESH_TOKENS': False,
     'BLACKLIST_AFTER_ROTATION': False,
     'UPDATE_LAST_LOGIN': False,
@@ -204,6 +205,7 @@ EMAIL_HOST = 'smtp.gmail.com'
 EMAIL_USE_TLS = True
 EMAIL_HOST_PASSWORD = 'bbje xrcv vubj idgq'
 EMAIL_HOST_USER = 'devop0387@gmail.com'
+DEFAULT_FROM_EMAIL='devop0387@gmail.com'
 
 
 try:

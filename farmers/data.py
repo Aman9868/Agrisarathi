@@ -12,6 +12,9 @@ from django.contrib.sessions.models import Session
 from django.http import HttpResponse
 from django.db.models import Q
 import pandas as pd
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework.permissions import AllowAny
 from django.conf import settings
 import xlrd
 import requests
@@ -22,14 +25,118 @@ from django.core.exceptions import ObjectDoesNotExist
 from django.core.files.base import ContentFile
 from transformers import pipeline
 from PIL import Image
-from django.core.mail import send_mail
 # from newsapi import NewsApiClient
 from django.core.exceptions import ValidationError
+from .serializers import *
+from rest_framework import status
+from datetime import timedelta
 # from serpapi import BingSearch
 base_url = "64.227.136.113:8090"
 import ast
+from django.core.mail import send_mail
 import logging
 logger = logging.getLogger('Agreeculture_App')
+
+#############################----------------------------Farmer Functionbs------------------------##################
+
+#####-------------------------For Creating Refresh and Acces Token
+def create_farmer_token(user, user_type):
+    refresh = RefreshToken.for_user(user)
+    refresh['user_type'] = user_type
+    print(f"Created token for user type: {user_type}")
+    return {
+        'refresh': str(refresh),
+        'access': str(refresh.access_token),
+    }
+
+##############----------------------For Sending email
+def send_otp_via_email(email, otp):
+    subject = 'Your OTP Code'
+    message = f'Your OTP code is {otp}. It is valid for 10 minutes.'
+    from_email = 'your-email@gmail.com'
+    recipient_list = [email]
+    send_mail(subject, message, from_email, recipient_list)
+
+#################---------------------For Sending Otps
+def send_otpmobile(request,mobile):
+    try:
+        url = "https://control.msg91.com/api/v5/otp"
+        otp = random.randint(0,9999)
+        params = {
+        "template_id": "66b0844cd6fc0578d732ba62",  
+        "mobile": mobile,                  
+        "authkey": "427492AbnBhrYUWsn66b0810eP1",
+        "realTimeResponse": "1"
+        }
+        payload = {
+        "OTP": otp  
+        }
+        headers = {
+        'Content-Type': "application/json"
+        }
+        response = requests.post(url, params=params, headers=headers, data=json.dumps(payload))
+        print(otp)
+        return Response(response.json())
+    except Exception as e:
+            error_message = str(e)
+            trace = traceback.format_exc()
+            return Response(
+            {
+                "status": "error",
+                "message": "An unexpected error occurred",
+                "error_message": error_message,
+                "traceback": trace
+            },
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+         )
+
+###############--------------------------Update user infro with mobile and email---------------#############
+def update_farmer_info(user, user_type, ip_address, mobile=None, is_new=False):
+    if user_type == 'farmer':
+        farmer, created = FarmerProfile.objects.get_or_create(user=user)
+        farmer.ip_address = ip_address
+        if mobile:
+                farmer.mobile = mobile  
+        if is_new or created:
+                farmer.created_by = user
+                farmer.created_at = timezone.now()
+        farmer.last_updated_by = user
+        farmer.last_updated_at = timezone.now()
+        farmer.save()
+#############-----------------For Creating & Reigstering new users--------------############
+def register_new_user(request, **kwargs):
+        mobile = kwargs.get('mobile')
+        user_type = kwargs.get('user_type')
+        try:
+            serializer = FarmerRegistrationSerializer(data=request.data)
+            if serializer.is_valid():
+                related_user = serializer.create(serializer.validated_data, user_type)
+                store_otp(related_user, kwargs['otp'])
+                tokens = create_farmer_token(related_user, user_type)
+                update_farmer_info(related_user, user_type, kwargs['ip_address'], is_new=True, mobile=mobile)
+                return Response({
+                    'message': f'User created and OTP sent successfully to {related_user.mobile}',
+                    'tokens': tokens
+                 }, status=status.HTTP_201_CREATED)
+            print(f"Registration failed with errors: {serializer.errors}")
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            error_message = str(e)
+            trace = traceback.format_exc()
+            return Response(
+            {
+                "status": "error",
+                "message": "An unexpected error occurred",
+                "error_message": error_message,
+                "traceback": trace
+            },
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+         )
+###########--------------------To store sende otp in backend
+def store_otp(user, otp):
+    expiry_time = timezone.now() + timedelta(minutes=5)
+    OTPVerification.objects.create(user=user, otp=otp, expires_at=expiry_time)
+
 
 ######################----------------------Addd State------------------------------------########################
 @csrf_exempt
@@ -90,21 +197,17 @@ def AddCropVariety(request):
     except Exception as e:
         return JsonResponse({'error': 'An error occurred.', 'details': str(e), 'traceback': traceback.format_exc()}, status=500)
     
-#############################################---------------------------Get Crop Variety Details----------------########
-@csrf_exempt
-def GetCropVariety(request):
-    try:
-        if request.method=="POST":
-            data = json.loads(request.body.decode('utf-8'))
-            crop_id=data.get('crop_id')
+#############################################---------------------------Get Crop Variety Details----------------################
+class GetCropVariety(APIView):
+    permission_classes=[AllowAny]
+    def get(self, request):
+        try:
+            crop_id=request.query_params.get('crop_id')
             variety=CropVariety.objects.filter(fk_crops_id=crop_id)
-            return JsonResponse({"data":list(variety.values())})
-        else:
-            return JsonResponse({'message': 'Method not allowed'}, status=405)
-    except Exception as e:
-        return JsonResponse({'error': 'An error occurred.', 'details': str(e), 'traceback': traceback.format_exc()}, status=500)
-    
-####################---------------------------------------Get All Crops-----------------------###############
+            return Response({'message':'success','data':list(variety.values())}, status=200)
+        except Exception as e:
+            return Response({'error': 'An error occurred.', 'details': str(e), 'traceback': traceback.format_exc()}, status=500)
+####################---------------------------------------Get All Crops-----------------------#############################
 @csrf_exempt
 def GetCrops(request):
     try:
@@ -124,20 +227,28 @@ def GetCrops(request):
 def AddSuggcropcsv(request):
     try:
         if request.method == "POST":
-            excel_file = r'/home/AgreecultureUpdate/Crop Suggestion (1).xlsx'
-            data_xl = pd.read_excel(excel_file)
+            excel_file = r'/home/aman/backend/AgrisarthiProject/Agrisarthi/Crop Suggestion (1).xlsx'
+            data = json.loads(request.body.decode('utf-8'))
+            user_language=data.get('user_language')
+            data_xl = pd.read_excel(excel_file,sheet_name="hin")
             for index, row in data_xl.iterrows():
                 # Assuming fk_crop is a ForeignKey field to CropMaster
                 crop_name = row['Crop Name']
-                crop_master = CropMaster.objects.get(crop_name=crop_name)  # Get the CropMaster instance
+                try:
+                    crop_master = CropMaster.objects.get(crop_name=crop_name)
+                except CropMaster.DoesNotExist:
+                    continue
 
                 SuggestedCrop.objects.create(
                     fk_crop=crop_master,
+                    fk_language_id=user_language,
                     season=row['When to be Suggested'],
                     description=row['Basic Description'],
                     weather_temperature=row['Weather Temperature'],
                     cost_of_cultivation=row['Cost of Cultivation (per acre)'],
                     market_price=row['Average Market Price (per quintal)'],
+                    start_month=row['start_month'],
+                    end_month=row['start_month'],
                     production=row['Average Production (per acre)']
                 )
             return JsonResponse({'success': 'Data Uploaded Successfully'})
@@ -148,14 +259,15 @@ def AddSuggcropcsv(request):
     
 ####################-----------------------------ADD Spices POP-------------------------##################
 @csrf_exempt
-def AddSpicesPOP(request):
+def AddPOP(request):
     try:
         if request.method=="POST":
-            user_language=request.POST.get('user_language')
-            crop_id=request.POST.get('crop_id')
-            filter_id=request.POST.get('filter_id')
-            excel_file = r'/home/AgreecultureUpdate/Wheat Pop.xlsx'
-            data_xl = pd.read_excel(excel_file,sheet_name='Wheat POP HI')
+            data = json.loads(request.body.decode('utf-8'))
+            user_language=data.get('user_language')
+            crop_id=data.get('crop_id')
+            filter_id=data.get('filter_id')
+            excel_file = r'/home/aman/backend/AgrisarthiProject/Agrisarthi/turmericpop.xlsx'
+            data_xl = pd.read_excel(excel_file,sheet_name='hin')
             for index, row in data_xl.iterrows():
                 SpicesPop.objects.create(
                     fk_language_id=user_language,
@@ -163,9 +275,9 @@ def AddSpicesPOP(request):
                     stages=row['stages'],
                     stage_name=row['stage_name'],
                     stage_number=row['stage_number'],
-                    sow_period=row['sow_period'],
                     description=row['description'],
                     preference=row['preference'],
+                    sow_period=row['sow_period'],
                     fk_croptype_id=filter_id
                 )
             return JsonResponse({'success':'Data Uploaded Successfully'})
