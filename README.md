@@ -1,46 +1,46 @@
 ## Run Locally
 
-1.Clone the project
+1. Clone the project
 
 ```bash
   git clone https://accessassist-admin@bitbucket.org/access-assist/agrisarthi.git
 ```
 
 
-Go to the project directory
+2. Go to the project directory
 
 ```bash
   cd Iagrisarthi
 ```
 
-2.Create Python Environment
+3. Create Python Environment
 
-a.Create Virtual Environment
+a. Create Virtual Environment
 
 ```bash
 virtualenv venv
 ```
-b.Activate Python Environment
+b. Activate Python Environment
 
 ```bash
 source venv/bin/activate
 ```
 
-3.Install Packages
+4. Install Packages
 
 To run this project, you will need to add the following environment variables to your .env file
 
 `pip install -r requirements.txt`
 
 
-4.Apply Migrations to Database
+5. Apply Migrations to Database
 
 ```bash
 python manage.py makemigrations
 python manage.py migrate
 ```
 
-5.Run App
+6. Run App
 
 ```bash
   python manage.py runserver
@@ -115,29 +115,29 @@ python manage.py migrate
     - Type the following into the file:
          ```nginx
         server {
-        listen 80;
-        server_name 64.227.166.238;
+            listen 80;
+            server_name 64.227.166.238;
 
-        access_log /var/log/nginx/agrisarathi.log;
+            access_log /var/log/nginx/agrisarathi.log;
 
-        client_max_body_size 200M;
+            client_max_body_size 200M;
 
-        location = /favicon.ico { access_log off; log_not_found off; }
+            location = /favicon.ico { access_log off; log_not_found off; }
 
-        location /static/ {
-        alias /home/Agrisarathi/agrisarthi/staticfiles/;  # Changed 'root' to 'alias'
-        autoindex on;
-        try_files $uri $uri/ =404;
-        }
+            location /static/ {
+            alias /home/Agrisarathi/agrisarthi/staticfiles/;  # Changed 'root' to 'alias'
+            autoindex on;
+            try_files $uri $uri/ =404;
+                }
 
-        location / {
-        include proxy_params;
-        proxy_pass http://127.0.0.1:8090;  # Added proxy_pass to point to the Gunicorn server
-        proxy_set_header X-Forwarded-Host $server_name;
-        proxy_set_header X-Real-IP $remote_addr;
-        add_header P3P 'CP="ALLDSP COR PSAa PSDa OURNOR ONL UNI COM NAV"';
-            }
-            }
+            location / {
+            include proxy_params;
+            proxy_pass http://127.0.0.1:8090;  # Added proxy_pass to point to the Gunicorn server
+            proxy_set_header X-Forwarded-Host $server_name;
+            proxy_set_header X-Real-IP $remote_addr;
+            add_header P3P 'CP="ALLDSP COR PSAa PSDa OURNOR ONL UNI COM NAV"';
+                }
+                }
          ```
     - Now we need to set up a symbolic link in the /etc/nginx/sites-enabled directory that points to this configuration file. That is how NGINX knows this site is active. Change directories to /etc/nginx/sites-enabled like this:
         - `cd /etc/nginx/sites-enabled`
