@@ -11,17 +11,26 @@ class FarmerRegistrationSerializer(serializers.ModelSerializer):
         model = CustomUser
         fields = ['mobile', 'email']
 
-    def create(self, validated_data, user_type):
+    def __init__(self, *args, **kwargs):
+        self.user_type = kwargs.pop('user_type', None)
+        super().__init__(*args, **kwargs)
+
+    def create(self, validated_data):
+        if self.user_type is None:
+            raise ValueError("user_type must be provided")
+
         user = CustomUser.objects.create_user(
-            mobile=validated_data['mobile'],
+            mobile=validated_data.get('mobile'),
             email=validated_data.get('email'),
-            user_type="farmer"
+            user_type=self.user_type
         )
-        if user_type == 'farmer':
+
+        if self.user_type == 'farmer':
             FarmerProfile.objects.create(user=user, mobile=user.mobile, email=user.email)
         else:
             raise ValueError("Invalid user type")
-        print(f"Created {user_type} user: {user}")
+
+        print(f"Created {self.user_type} user: {user}")
         return user
 ##############################---------------------------Farm land Serializers-----------------########
 class FarmerLandAddressSerializer(serializers.ModelSerializer):
@@ -38,6 +47,17 @@ class ServiceProviderSerializer(serializers.ModelSerializer):
     class Meta:
         model = Service_Provider
         fields = '__all__'
+##############---------------------------------All States Serializer---------------------###########
+class StatesSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = StateMaster
+        fields = '__all__'
+
+##############---------------------------------All District Serializer---------------------###########
+class DistrictMasterSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = DistrictMaster
+        fields = '__all__' 
 ######################----------------------------------------Initial Screen Crops--------------------------###########
 class CropImagesSerializer(serializers.ModelSerializer):
     class Meta:

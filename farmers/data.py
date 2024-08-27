@@ -58,6 +58,7 @@ def send_otp_via_email(email, otp):
     send_mail(subject, message, from_email, recipient_list)
 
 #################---------------------For Sending Otps
+#################---------------------For Sending Otps
 def send_otpmobile(request,mobile):
     try:
         url = "https://control.msg91.com/api/v5/otp"
@@ -96,46 +97,57 @@ def update_farmer_info(user, user_type, ip_address, mobile=None, is_new=False):
         farmer, created = FarmerProfile.objects.get_or_create(user=user)
         farmer.ip_address = ip_address
         if mobile:
-                farmer.mobile = mobile  
+            farmer.mobile = mobile  
         if is_new or created:
-                farmer.created_by = user
-                farmer.created_at = timezone.now()
+            farmer.created_by = user
+            farmer.created_at = timezone.now()
+            farmer.is_new_user = True
+        else:
+            farmer.is_new_user = False
         farmer.last_updated_by = user
         farmer.last_updated_at = timezone.now()
         farmer.save()
 #############-----------------For Creating & Reigstering new users--------------############
 def register_new_user(request, **kwargs):
-        mobile = kwargs.get('mobile')
-        user_type = kwargs.get('user_type')
-        try:
-            serializer = FarmerRegistrationSerializer(data=request.data)
-            if serializer.is_valid():
-                related_user = serializer.create(serializer.validated_data, user_type)
-                store_otp(related_user, kwargs['otp'])
-                tokens = create_farmer_token(related_user, user_type)
-                update_farmer_info(related_user, user_type, kwargs['ip_address'], is_new=True, mobile=mobile)
-                return Response({
-                    'message': f'User created and OTP sent successfully to {related_user.mobile}',
-                    'tokens': tokens
-                 }, status=status.HTTP_201_CREATED)
-            print(f"Registration failed with errors: {serializer.errors}")
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-        except Exception as e:
-            error_message = str(e)
-            trace = traceback.format_exc()
-            return Response(
-            {
-                "status": "error",
-                "message": "An unexpected error occurred",
-                "error_message": error_message,
-                "traceback": trace
-            },
-            status=status.HTTP_500_INTERNAL_SERVER_ERROR
-         )
+    mobile = kwargs.get('mobile')
+    user_type = kwargs.get('user_type')
+    otp = kwargs.get('otp')
+    try:
+        serializer = FarmerRegistrationSerializer(data=request.data)
+        if serializer.is_valid():
+            related_user = serializer.create(serializer.validated_data, user_type)
+            store_otp(related_user, otp)
+            update_farmer_info(related_user, user_type, kwargs['ip_address'], is_new=True, mobile=mobile)
+            return Response({
+                'message': f'User created and OTP sent successfully to {related_user.mobile}',
+                'is_existing_user': False,
+                'otp':otp
+            }, status=status.HTTP_201_CREATED)
+        print(f"Registration failed with errors: {serializer.errors}")
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    except Exception as e:
+        error_message = str(e)
+        trace = traceback.format_exc()
+        return Response(
+        {
+            "status": "error",
+            "message": "An unexpected error occurred",
+            "error_message": error_message,
+            "traceback": trace
+        },
+        status=status.HTTP_500_INTERNAL_SERVER_ERROR
+     )
 ###########--------------------To store sende otp in backend
-def store_otp(user, otp):
-    expiry_time = timezone.now() + timedelta(minutes=5)
-    OTPVerification.objects.create(user=user, otp=otp, expires_at=expiry_time)
+def store_otp(identifier, otp):
+    expires_at = timezone.now() + timedelta(minutes=5)
+    otp_record, created = OTPVerification.objects.update_or_create(
+        mobile=identifier,
+        defaults={
+            'otp': otp,
+            'expires_at': expires_at
+        }
+    )
+    return otp_record
 
 
 ######################----------------------Addd State------------------------------------########################
@@ -163,7 +175,7 @@ def AddDistrict(request):
         if request.method=="POST":
             user_language=request.POST.get('user_language')
             state_id=request.POST.get('state_id')
-            excel_file = r'/home/AgreecultureUpdate/staticfiles/files/Districtdata.xlsx'
+            excel_file = r'/home/Agrisarathi/agrisarthi/staticfiles/updistrict.xlsx'
             data_xl = pd.read_excel(excel_file,sheet_name='hi')
             for index, row in data_xl.iterrows():
                 DistrictMaster.objects.create(
@@ -184,12 +196,14 @@ def AddCropVariety(request):
         if request.method=="POST":
             data = json.loads(request.body.decode('utf-8'))
             crop_id=data.get('crop_id')
-            excel_file = r'/home/AgreecultureUpdate/static/potatovariety.xlsx'
-            data_xl = pd.read_excel(excel_file,sheet_name='mango')
+            user_language=data.get('user_language')
+            excel_file = r'/home/Agrisarathi/agrisarthi/staticfiles/PotaoVariety.xlsx'
+            data_xl = pd.read_excel(excel_file,sheet_name='hin')
             for index, row in data_xl.iterrows():
                 CropVariety.objects.create(
                     fk_crops_id=crop_id,
-                    variety=row['Variety']
+                    fk_language_id=user_language,
+                    variety=row['Cropvariety']
                 )
             return JsonResponse({'success':'Data Uploaded Successfully'})
         else:
@@ -197,16 +211,7 @@ def AddCropVariety(request):
     except Exception as e:
         return JsonResponse({'error': 'An error occurred.', 'details': str(e), 'traceback': traceback.format_exc()}, status=500)
     
-#############################################---------------------------Get Crop Variety Details----------------################
-class GetCropVariety(APIView):
-    permission_classes=[AllowAny]
-    def get(self, request):
-        try:
-            crop_id=request.query_params.get('crop_id')
-            variety=CropVariety.objects.filter(fk_crops_id=crop_id)
-            return Response({'message':'success','data':list(variety.values())}, status=200)
-        except Exception as e:
-            return Response({'error': 'An error occurred.', 'details': str(e), 'traceback': traceback.format_exc()}, status=500)
+
 ####################---------------------------------------Get All Crops-----------------------#############################
 @csrf_exempt
 def GetCrops(request):

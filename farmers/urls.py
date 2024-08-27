@@ -1,14 +1,25 @@
 from django.urls import path
 from .views import *
+from .data import *
+from rest_framework_simplejwt.views import (
+    TokenRefreshView,
+)
+
 
 urlpatterns = [
     path('FarmerLogin',FarmerLogin.as_view(), name='FarmerLogin'),
     path('VerifyOTP',VerifyOTP.as_view(), name='VerifyOTP'),
     path('FarmerLogout',FarmerLogout.as_view(), name='FarmerLogout'),
-    ################---------------------Get Farmer ALL Land INfo & Add Farm Land by Farmer------------------#########
-    path('FarmerAllLandsInfo',FarmerAddGetallLandInfo.as_view(),name='FarmerAllLandsInfo'),
+    path('TokenRefreshView',TokenRefreshView.as_view(), name='token_refresh'),
+    ################---------------------Get Farmer ALL Land INfo & Add Farm Land by Farmer & Update Land------------------#########
+    path('FarmerAddGetallLandInfo',FarmerAddGetallLandInfo.as_view(),name='FarmerAllLandsInfo'),
+    path('GetallStates',GetallStates.as_view(), name='GetallStates'),
+    path('AddDistrict',AddDistrict,name='AddDistrict'),
+    path('AddCropVariety',AddCropVariety,name='AddCropVariety'),
+    path('GetStateWiseDistrict',GetStateWiseDistrict.as_view(), name='GetStateWiseDistrict'),
+    path('GetCropVariety',GetCropVariety.as_view(), name='GetCropVariety'),
 
-    ########---Get Farmer Single Land Details ,Update Farmer and Land Details-------##
+    ########---Get Farmer Single Land Details ,Update FarmerDetails-------##
     path('FarmerDetailsGetUpdate',FarmerDetailsGetUpdate.as_view(),name='FarmerDetailsGetUpdate'),
 
     #####################-----------------Send Otp to Users Email and Verfy it successfully with is_verified True-----##

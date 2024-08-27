@@ -109,9 +109,8 @@ class UserProfileView(APIView):
   permission_classes = [IsAuthenticated]
   def get(self, request, format=None):
         user = request.user
-        user_type=request.query_params.get('user_type')
         print(f"User is {user.user_type}")
-        if user.user_type == 'fpo' and user_type=="fpo":
+        if user.user_type == 'fpo':
             try:
                 fpoid = get_object_or_404(FPO, user=user)
                 print(f"FPO Details:{fpoid}")
@@ -120,7 +119,7 @@ class UserProfileView(APIView):
                                  },status=status.HTTP_200_OK)
             except FPO.DoesNotExist:
                 return Response({'error': 'FPO details not found'}, status=status.HTTP_404_NOT_FOUND)
-        elif user.user_type =='supplier' and user_type=="supplier":
+        elif user.user_type =='supplier':
             try:
                 supplier = get_object_or_404(Supplier, user=user)
                 print(f"Supplier Details:{supplier}")
@@ -138,9 +137,8 @@ class UpdateProfile(APIView):
     def put(self, request, format=None):
         user = request.user
         data = request.data
-        user_type=data['user_type']
         try:
-            if user.user_type == 'fpo' and user_type=='fpo':
+            if user.user_type == 'fpo':
                 try:
                     fpo_profile = FPO.objects.get(user=user)
                 except FPO.DoesNotExist:
@@ -175,7 +173,7 @@ class UpdateProfile(APIView):
                 fpo_bank_business.save()
                 fpo_shop.save() 
                 return Response({'message': 'FPO profile updated successfully'}, status=status.HTTP_200_OK)
-            elif user.user_type =='supplier' and user_type=='supplier':
+            elif user.user_type =='supplier':
                 try:
                     supplier_profile = Supplier.objects.get(user=user)
                 except Supplier.DoesNotExist:
@@ -226,10 +224,9 @@ class UpdateProfilePicture(APIView):
         user = request.user
         try:
             profile_picture = request.FILES.get('profile')
-            user_type=request.data.get('user_type')
             print(f"Profile Picture: {profile_picture}")
             if profile_picture:
-                if user.user_type == 'fpo' and user_type=="fpo":
+                if user.user_type == 'fpo':
                     try:
                         fpo_profile = FPO.objects.get(user=user)
                     except FPO.DoesNotExist:
@@ -239,7 +236,7 @@ class UpdateProfilePicture(APIView):
                     fpo_profile.save()
                     return Response({'message': 'FPO profile picture updated successfully'}, status=status.HTTP_200_OK)
 
-                elif user.user_type == 'supplier' and user_type=="supplier":
+                elif user.user_type == 'supplier':
                     try:
                         supplier_profile = Supplier.objects.get(user=user)
                     except Supplier.DoesNotExist:
@@ -271,12 +268,11 @@ class ResetPasssword(APIView):
         try:
             mobile = request.data.get('mobile')
             new_password = request.data.get('new_password')
-            user_type = request.data.get('user_type')
             
             if not mobile or not new_password:
                 return Response({'error': 'Please provide mobile and new_password'}, status=status.HTTP_400_BAD_REQUEST)
             
-            if user.user_type == 'fpo' and user_type=='fpo':
+            if user.user_type == 'fpo':
                 try:
                     fpo = FPO.objects.filter(user=user, mobile=mobile).first()
                     if fpo:
@@ -290,7 +286,7 @@ class ResetPasssword(APIView):
                 except FPO.DoesNotExist:
                     return Response({'error': 'FPO not found with given mobile number'}, status=status.HTTP_404_NOT_FOUND)
             
-            elif user.user_type == 'supplier' and user_type=='supplier':
+            elif user.user_type == 'supplier':
                 try:
                     supplier = Supplier.objects.filter(user=user, mobile=mobile).first()
                     if supplier:
@@ -471,16 +467,13 @@ class GetSingleFarmerDetailsbyFPO(APIView):
             user = request.user
             print(f"User is {user.user_type}")
             try:
-                farmer_id=request.data.get('farmer_id')
-                if farmer_id is None:
-                    return Response({'error':'FPO ID Not Provided'},status=status.HTTP_400_BAD_REQUEST)
                 if user.user_type == 'fpo':
                     try:
                         fpo_profile = FPO.objects.get(user=user)
                     except FPO.DoesNotExist:
                         return Response({'error': 'FPO details not found'}, status=status.HTTP_404_NOT_FOUND)
 
-                fpo_farmers = FarmerProfile.objects.filter(fpo_name_id=fpo_profile,id=farmer_id)
+                fpo_farmers = FarmerProfile.objects.filter(fpo_name_id=fpo_profile,id=fpo_profile.id)
                 farmers_data = []
                 for farmer in fpo_farmers:
                     farmers_data.append({
@@ -555,10 +548,9 @@ class ProductDetailsAddGetDelUpdate(APIView):
         try:
             producttype=request.data.get('producttype')
             productname=request.data.get('productName')
-            user_type = request.data.get('user_type')
             if not producttype or not productname:
                 return Response({'error':'Product Name and Product Type are required'},status=status.HTTP_400_BAD_REQUEST)
-            if user.user_type == 'fpo' and user_type=='fpo':
+            if user.user_type == 'fpo':
                 try:
                     fpo_profile = FPO.objects.get(user=user)
                     print(f"Fpo Profile : {fpo_profile}")
@@ -614,7 +606,7 @@ class ProductDetailsAddGetDelUpdate(APIView):
                 fk_fposupplier=supplier
                 )
                 return Response({'message': 'FPO Product created & Added successfully!'})
-            elif user.user_type=='supplier' and user_type=='supplier':
+            elif user.user_type=='supplier':
                 try:
                     supplier_info = Supplier.objects.get(user=user)
                 except Supplier.DoesNotExist:
@@ -682,9 +674,8 @@ class ProductDetailsAddGetDelUpdate(APIView):
     def put(self,request,format=None):
         user=request.user
         print(F"User: {user}")
-        user_type = request.data.get('user_type')
         try:
-            if user.user_type == 'fpo' and user_type=='fpo':
+            if user.user_type == 'fpo':
                 product_ids = request.data.get('product_id', [])
                 if not product_ids:
                     return Response({'message': 'Product id must be required'}, status=404)
@@ -735,7 +726,7 @@ class ProductDetailsAddGetDelUpdate(APIView):
                     except InventoryDetails.DoesNotExist:
                         return Response({'message': f'Inventory details for product ID {product.id} not found'}, status=404)
                 return Response({'status':'success','message': 'Products updated successfully'},status=status.HTTP_200_OK)
-            elif user.user_type=="supplier" and user_type=="supplier":
+            elif user.user_type=="supplier":
                 product_ids = request.data.get('product_id', [])
                 if not product_ids:
                     return Response({'message': 'Product id must be required'}, status=404)
@@ -797,10 +788,9 @@ class ProductDetailsAddGetDelUpdate(APIView):
         print(F"User: {user}")
         try:
             product_ids = request.data.get('product_id', [])
-            user_type=request.data.get('user_type')
             if not product_ids:
                     return Response({'message': 'Product id must be required'}, status=404)
-            if user.user_type == 'fpo' and user_type=='fpo':
+            if user.user_type == 'fpo':
                 try:
                     fpo_profile = FPO.objects.get(user=user)
                     print(f"Fpo Profile : {fpo_profile}")
@@ -817,7 +807,7 @@ class ProductDetailsAddGetDelUpdate(APIView):
                     return Response({'message': f'{productdel_count} products deleted successfully'},status=status.HTTP_200_OK)
                 else:
                     return Response({'message': 'No products found to delete'}, status=404)
-            elif user.user_type =='supplier' and user_type=='supplier':
+            elif user.user_type =='supplier':
                 try:
                     supplier_info = Supplier.objects.get(user=user)
                     print(f"Supplier Profile : {supplier_info}")
@@ -850,9 +840,8 @@ class ProductDetailsAddGetDelUpdate(APIView):
     def get(self,request,format=None):
         user=request.user
         print(f"User: {user}")
-        user_type=request.query_params.get('user_type')
         try:
-            if user.user_type == 'fpo' and user_type=='fpo':
+            if user.user_type == 'fpo':
                 product_id = request.query_params.get('product_id')
 
                 try:
@@ -866,7 +855,7 @@ class ProductDetailsAddGetDelUpdate(APIView):
 
                 serializer = FPOProductDetailsSerializer(products, many=True, context={'fpo_id': fpo_profile.id})
                 return Response(serializer.data, status=status.HTTP_200_OK)
-            elif user.user_type =='supplier' and user_type=='supplier':
+            elif user.user_type =='supplier':
                 try:
                     supplier_profile = Supplier.objects.get(user=user)
                     print(f"Supplier Profile :{supplier_profile}")
@@ -899,9 +888,7 @@ class PurchaseInfo(APIView):
         print(f"User: {user}")
         try:
             supplier_id=request.query_params.get('supplier_id')
-            user_type=request.query_params.get('user_type')
-            
-            if user.user_type == 'fpo' and user_type=='fpo':
+            if user.user_type == 'fpo':
                 try:
                     fpo_profile = FPO.objects.get(user=user)
                     print(f"Fpo Profile : {fpo_profile}")
@@ -912,7 +899,7 @@ class PurchaseInfo(APIView):
                     return Response({'message': 'No suppliers found'}, status=status.HTTP_404_NOT_FOUND)
                 serializer = FPOSuppliersSerializer(suppliers, many=True, context={'fpo_id': fpo_profile.id})
                 return Response({"message": "success", 'supplier_details': serializer.data}, status=status.HTTP_200_OK)
-            elif user.user_type =='supplier' and user_type=='supplier':
+            elif user.user_type =='supplier':
                 try:
                     supplier_profile = Supplier.objects.get(user=user)
                     print(f"Supplier Profile :{supplier_profile}")
@@ -935,10 +922,9 @@ class GetallProductsInfo(APIView):
     permission_classes=[IsAuthenticated]
     def get(self,request):
         user=request.user
-        user_type=request.query_params.get('user_type')
         print(f"User: {user}")
         try:
-            if user.user_type == 'fpo' and user_type=='fpo':
+            if user.user_type == 'fpo':
                 try:
                     fpo_profile = FPO.objects.get(user=user)
                     print(f"Fpo Profile : {fpo_profile}")
@@ -952,7 +938,7 @@ class GetallProductsInfo(APIView):
                 prices_serializer = ProductPricesSerializer(prices, many=True)
                 return Response({'status': 'success','product': product_serializer.data,'prices': prices_serializer.data},
                                  status=status.HTTP_200_OK)
-            elif user.user_type =='supplier' and user_type=='supplier':
+            elif user.user_type =='supplier':
                 try:
                     supplier_profile = Supplier.objects.get(user=user)
                     print(f"Supplier Profile :{supplier_profile}")
@@ -981,10 +967,9 @@ class InventorySection(APIView):
         print(f"User: {user}")
         try:
             filter_type=request.query_params.get('filter_type')
-            user_type=request.query_params.get('user_type')
             if not filter_type:
                 return Response({'error': 'Filter type is required'}, status=400)
-            if user.user_type == 'fpo' and user_type=='fpo':
+            if user.user_type == 'fpo':
                 try:
                     fpo_profile = FPO.objects.get(user=user)
                     print(f"Fpo Profile : {fpo_profile}")
@@ -998,7 +983,7 @@ class InventorySection(APIView):
                 print(f"Inventory's: {inventory_serializer.data}")
                 return Response({'status': 'success','inventory': inventory_serializer.data},
                                  status=status.HTTP_200_OK)
-            elif user.user_type =='supplier' and user_type=='supplier':
+            elif user.user_type =='supplier':
                 try:
                     supplier_profile = Supplier.objects.get(user=user)
                     print(f"Supplier Profile :{supplier_profile}")
@@ -1025,10 +1010,9 @@ class InventorySection(APIView):
         try:
             inventory_id=request.data.get('inventory_id')
             new_stock=request.data.get('new_stock')
-            user_type=request.data.get('user_type')
             if not inventory_id or not new_stock:
                     return Response({'error': 'Product id and quantity are required'}, status=400)
-            if user.user_type == 'fpo' and user_type=='fpo':
+            if user.user_type == 'fpo':
                 try:
                     fpo_profile = FPO.objects.get(user=user)
                     print(f"Fpo Profile : {fpo_profile}")
@@ -1049,7 +1033,7 @@ class InventorySection(APIView):
                 inventory.stock = new_stock
                 inventory.save()
                 return Response({'status':'success','message':'Inventory Updated Successfully'},status=status.HTTP_200_OK)
-            elif user.user_type=="supplier" and user_type=="supplier":
+            elif user.user_type=="supplier":
                 try:
                     supplier_profile = Supplier.objects.get(user=user)
                     print(f"Supplier Profile :{supplier_profile}")
@@ -1081,10 +1065,9 @@ class AddGetSales(APIView):
     permission_classes=[IsAuthenticated]
     def post(self,request,format=None):
         user=request.user
-        user_type=request.data.get('user_type')
         print(f"User: {user}")
         try:
-            if user.user_type == 'fpo' and user_type=='fpo':
+            if user.user_type == 'fpo':
                 buyer_name, mobile_no, address, sale_date, products, payment = map(request.data.get, 
                         ['buyer_name', 'mobile_no', 'address', 'sale_date', 'products', 'payment'])
                 if not sale_date or not payment or not products or not mobile_no:
@@ -1143,7 +1126,7 @@ class AddGetSales(APIView):
 
                 return Response({"message": "Sales processed successfully", "sales": sale_responses,
                               "total_price": total_price}, status=201)
-            elif user.user_type=="supplier" and user_type=="supplier":
+            elif user.user_type=="supplier":
                 buyer_name, mobile_no, address, sale_date, products, payment = map(request.data.get, 
                         ['buyer_name', 'mobile_no', 'address', 'sale_date', 'products', 'payment'])
                 if not sale_date or not payment or not products or not mobile_no:
@@ -1208,10 +1191,9 @@ class AddGetSales(APIView):
     
     def get(self, request,format=None):
         user=request.user
-        user_type=request.query_params.get('user_type')
         print(f"Users is : {user}")
         try:
-            if user.user_type=='fpo' and user_type=='fpo':
+            if user.user_type=='fpo':
                 try:
                     fpo_profile = FPO.objects.get(user=user)
                     print(f"FPO Profile: {fpo_profile}")
@@ -1220,7 +1202,7 @@ class AddGetSales(APIView):
                 sales=SalesRecordItem.objects.filter(fk_fpo=fpo_profile).order_by('sales_date')
                 sales_serializer=FPOSalesRecordItemSerializer(data=sales,many=True)
                 return Response(sales_serializer.data, status=200)
-            elif user.user_type=='supplier' and user_type=='supplier':
+            elif user.user_type=='supplier':
                 try:
                     supplier_profile = Supplier.objects.get(user=user)
                     print(f"Supplier Profile: {supplier_profile}")
@@ -1242,9 +1224,8 @@ class InventoryInoutStock(APIView):
     def get(self,request,format=None):
         user=request.user
         print(f"Users is :{user}")
-        user_type=request.query_params.get('user_type')
         try:
-            if user.user_type=='fpo' and user_type=='fpo':
+            if user.user_type=='fpo':
                 filter_type=request.query_params.get('filter_type')
                 status=request.query_params.get('status')
                 if not filter_type and not status:
@@ -1267,7 +1248,7 @@ class InventoryInoutStock(APIView):
                     return Response({"message": "Inventory Out Stock fetched successfully", "inventory": outtockls, "total_inventory": totaloutsock}, status=200)
                 else:
                     return Response({'error': 'Invalid status provided'}, status=400)
-            elif user.user_type=='supplier' and user_type=='supplier':
+            elif user.user_type=='supplier':
                 filter_type=request.query_params.get('filter_type')
                 status=request.query_params.get('status')
                 if not filter_type and not status:
@@ -1304,12 +1285,11 @@ class MonthlySales(APIView):
     def get(self,request):
         user=request.user
         print(f"Users is :{user}")
-        user_type =request.query_params.get('user_type')
         try:
             filter_type =request.query_params.get('filter_type')
             if not filter_type:
                 return Response({'error': 'Filter type must be provided'}, status=400)
-            if user.user_type == 'fpo' and user_type=='fpo':
+            if user.user_type == 'fpo':
                 try:
                     fpo_profile=FPO.objects.get(user=user)
                     print(f"FPO Profile: {fpo_profile}")
@@ -1318,7 +1298,7 @@ class MonthlySales(APIView):
                 sales = SalesRecordItem.objects.filter(fk_fpo=fpo_profile,category=filter_type)
                 sales_serializer=MonthlySalesSerializer(sales,many=True)
                 return Response(sales_serializer.data, status=status.HTTP_200_OK)
-            elif user.user_type =='supplier' and user_type=='supplier':
+            elif user.user_type =='supplier':
                 try:
                     supplier_profile=Supplier.objects.get(user=user)
                     print(f"Supplier Profile: {supplier_profile}")
@@ -1343,9 +1323,8 @@ class TotalSales(APIView):
         print(f"User is:{user}")
         try:
             filter_type =request.query_params.get('filter_type')
-            user_type =request.query_params.get('user_type')
             sales_status=request.query_params.get('sales_status')
-            if user.user_type=='fpo' and user_type=='fpo':
+            if user.user_type=='fpo':
                 try:
                     fpo_profile=FPO.objects.get(user=user)
                 except FPO.DoesNotExist:
@@ -1374,7 +1353,7 @@ class TotalSales(APIView):
                 return Response({'sales_count': sales_count,
                 'total_sales_amount': round(total_sales_amount),
                 'total_profit': round(total_profit)},status=status.HTTP_200_OK)
-            elif user.user_type=='supplier' and user_type=='supplier':
+            elif user.user_type=='supplier':
                 try:
                     supplier_profile=Supplier.objects.get(user=user)
                 except Supplier.DoesNotExist:

@@ -30,9 +30,21 @@ SECRET_KEY = 'django-insecure-0as(1r6ccmmgb67izl!o7g(!r&px^as%o*!+#1!djix8e_8)5p
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
+CSRF_TRUSTED_ORIGINS = [
+    'http://64.227.166.238',
+    'http://localhost:5173', 
+    'https://agrisarathi.com',
+    'https://www.agrisarathi.com',
+    'https://api.agrisarathi.com',
+]
 
-ALLOWED_HOSTS = []
-
+ALLOWED_HOSTS = ['64.227.166.238', 'localhost', '127.0.0.1','*']
+CORS_ALLOW_ALL_ORIGINS = True
+#SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+#SECURE_SSL_REDIRECT = True
+#SESSION_COOKIE_SECURE = True
+#CSRF_COOKIE_SECURE = True
+MANAGE_PY = os.path.join(BASE_DIR, 'manage.py')
 
 # Application definition
 
@@ -61,6 +73,7 @@ MIDDLEWARE = [
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
+    'corsheaders.middleware.CorsMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
@@ -95,9 +108,14 @@ DATABASES = {
         'ENGINE': 'django.db.backends.mysql',
         'NAME': os.getenv('DB_NAME', 'agrisarathi'),
         'USER': os.getenv('DB_USER', 'root'),
-        'PASSWORD': os.getenv('DB_PASSWORD', 'root'),
+        'PASSWORD': os.getenv('DB_PASSWORD', 'Root@123'),
         'HOST': os.getenv('DB_HOST', 'localhost'),
         'PORT': os.getenv('DB_PORT', '3306'),
+        'OPTIONS': {
+             'charset': 'utf8mb4',
+             'use_unicode': True,
+             'unix_socket': '/var/run/mysqld/mysqld.sock',
+         }
     }
     #'slave': {
     #    'ENGINE': 'django.db.backends.mysql',
@@ -148,10 +166,8 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/5.1/howto/static-files/
 
 STATIC_URL = '/static/'
-STATIC_ROOT = BASE_DIR / "staticfiles"
-STATICFILES_DIRS = [
-    os.path.join(BASE_DIR, 'static'),
-]
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 MEDIA_URL = '/media/'
@@ -229,11 +245,11 @@ CELERY_BEAT_SCHEDULER = 'django_celery_beat.schedulers.DatabaseScheduler'
 CELERY_TIMEZONE="Asia/Kolkata"
 CELERY_BEAT_SCHEDULE = {
     'backup-database-everyday': {
-        'task': 'Agrisarthi.tasks.backup_database',
+        'task': 'farmers.tasks.backup_database',
         'schedule': crontab(hour=0, minute=0),  # Runs every day at 12:00 AM
     },
     'scrape-every-24-hours': {
-        'task': 'Agrisarthi.tasks.process_and_scrape_data_task',
+        'task': 'farmers.tasks.process_and_scrape_data_task',
         'schedule': crontab(hour=13, minute=0, day_of_week='*'),  # Runs at 1 P.M IST every day
     },
 }

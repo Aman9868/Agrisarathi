@@ -8,7 +8,7 @@ import logging
 from django.conf import settings
 import os
 from datetime import datetime
-logger = logging.getLogger('Agreeculture_App')
+logger = logging.getLogger('farmers')
 @shared_task
 def process_and_scrape_data_task():
     try:

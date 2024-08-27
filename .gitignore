@@ -15,7 +15,7 @@ backup.sql
 .idea/
 nohup.out
 static/
-
+backups/
 # C extensions
 *.so
 

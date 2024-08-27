@@ -183,7 +183,7 @@ class CropImagesAdmin(admin.ModelAdmin):
 ###########################################----------------------Crop Variety---------------------------------------#################
 @admin.register(CropVariety)
 class CropVarietyAdmin(admin.ModelAdmin):
-    list_display=('id','getcrop_name','variety')
+    list_display=('id','getcrop_name','variety','fk_language')
     search_fields=('variety',)
     def getcrop_name(self,obj):
         return obj.fk_crops.crop_name if obj.fk_crops else None
@@ -398,7 +398,7 @@ class SuggestedCropAdmin(admin.ModelAdmin):
 ######################------------------------------OTP Verification-------------- #####################
 @admin.register(OTPVerification)
 class OTPVerificationAdmin(admin.ModelAdmin):
-    list_display = ('id', 'user', 'otp', 'created_at')
+    list_display = ('id', 'mobile', 'otp', 'created_at')
 
 ###############################--------------------------------------Disease Section-------------######################
 @admin.register(DiseaseProductInfo)

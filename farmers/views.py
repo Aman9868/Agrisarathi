@@ -22,17 +22,16 @@ from .data import *
 import random
 import requests
 import json
-####################-------------------------------------Farmer Login----------------###########################
+#################################################################
 class FarmerLogin(APIView):
     permission_classes = [AllowAny]
     def post(self, request, format=None):
-        user=request.user
-        print(f"User is :{user}")
         user_type = request.data.get('user_type')
         mobile = request.data.get('mobile')
         email = request.data.get('email')
         login_type = request.data.get('login_type')
         ip_address = request.META.get('REMOTE_ADDR')
+
         if not user_type or not login_type:
             return Response({'error': 'user_type and login_type are required'}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -47,90 +46,138 @@ class FarmerLogin(APIView):
 
         otp = random.randint(1000, 9999)
         print(f"Login attempt with {login_type}: {mobile or email}, user_type: {user_type}, IP address: {ip_address}")
-        print(f"\n Otp is {otp}")
+        print(f"\nOtp is {otp}")
 
         try:
             if login_type == 'email':
-                user = CustomUser.objects.filter(email=email, user_type=user_type,email_verified=True).first()
+                user = CustomUser.objects.filter(email=email, user_type=user_type, email_verified=True).first()
+                print(f"User object:{user}")
+                is_existing_user = FarmerProfile.objects.filter(user=user).exists() if user else False
+                print(f"Is existing Farmer:{is_existing_user}")
                 if user:
                     send_otp_via_email(email, otp)
-                    store_otp(user, otp)
-                    tokens = create_farmer_token(user, user_type)
-                    update_farmer_info(user, user_type, ip_address)
                     return Response({
                         'message': f"OTP sent successfully to {user.email}",
-                        'tokens': tokens
+                        'otp': otp,
+                        'is_existing_user': is_existing_user
                     }, status=status.HTTP_200_OK)
                 else:
-                    return Response({'error': 'Email not associated with any account'}, status=status.HTTP_400_BAD_REQUEST)
+                    send_otp_via_email(email, otp)
+                    return Response({
+                        'message': f"OTP sent successfully to {email}",
+                        'otp': otp,
+                        'is_existing_user': False
+                    }, status=status.HTTP_200_OK)
 
             elif login_type == 'mobile':
                 user = CustomUser.objects.filter(mobile=mobile, user_type=user_type).first()
+                print(f"User object:{user}")
+                is_existing_user = FarmerProfile.objects.filter(user=user).exists() if user else False
+                print(f"Is existing Farmer:{is_existing_user}")
                 if user:
                     send_otpmobile(mobile, otp)
-                    store_otp(user, otp)
-                    tokens = create_farmer_token(user, user_type)
-                    update_farmer_info(user, user_type, ip_address, mobile=mobile)
+                    store_otp(mobile, otp)
                     return Response({
                         'message': f"OTP sent successfully to {user.mobile}",
-                        'tokens': tokens
+                        'otp': otp,
+                        'is_existing_user': is_existing_user
                     }, status=status.HTTP_200_OK)
                 else:
-                    return register_new_user(request, mobile=mobile, user_type=user_type, otp=otp, ip_address=ip_address)
+                    send_otpmobile(mobile, otp)
+                    store_otp(mobile, otp)
+                    return Response({
+                        'message': f"OTP sent successfully to {mobile}",
+                        'otp': otp,
+                        'is_existing_user': False
+                    }, status=status.HTTP_200_OK)
 
         except Exception as e:
             error_message = str(e)
             trace = traceback.format_exc()
             return Response(
-            {
-                "status": "error",
-                "message": "An unexpected error occurred",
-                "error_message": error_message,
-                "traceback": trace
-            },
-            status=status.HTTP_500_INTERNAL_SERVER_ERROR
-         )
+                {
+                    "status": "error",
+                    "message": "An unexpected error occurred",
+                    "error_message": error_message,
+                    "traceback": trace
+                },
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
 #################------------------------------------------Verify Otp-------------------###############
 class VerifyOTP(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
     def post(self, request, format=None):
         login_type = request.data.get('login_type')
-        mobile=request.data.get('mobile')  
-        email=request.data.get('email',' ')
-        otp = request.data.get('otp') 
+        mobile = request.data.get('mobile')
+        email = request.data.get('email', '')
+        otp = request.data.get('otp')
+        user_type = request.data.get('user_type')
 
-        if not login_type or  not otp:
-            return Response({'error': 'login_type, identifier, and otp are required'}, status=status.HTTP_400_BAD_REQUEST)
+        if not login_type or not otp or not user_type:
+            return Response({'error': 'login_type, identifier, user_type, and otp are required'}, status=status.HTTP_400_BAD_REQUEST)
 
         if login_type not in ['email', 'mobile']:
             return Response({'error': 'Invalid login_type'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        print(f"Login type:{login_type}, Mobile:{mobile},Email:{email} OTP:{otp}, UserType:{user_type}")
 
         try:
             user = None
             if login_type == 'email':
-                user = CustomUser.objects.filter(email=email).first()
-                
+                user = CustomUser.objects.filter(email=email, user_type=user_type).first()
+                print(f"User is {user}")
             elif login_type == 'mobile':
-                user = CustomUser.objects.filter(mobile=mobile).first()
+                user = CustomUser.objects.filter(mobile=mobile, user_type=user_type).first()
+                print(f"User is {user}")
+
+            otp_record = OTPVerification.objects.filter(
+                mobile=mobile if login_type == 'mobile' else None,
+                otp=otp
+            ).order_by('-expires_at').first()
+            print(f"OTP record: {otp_record}")
+
+            if otp_record is None or otp_record.expires_at < timezone.now():
+                return Response({'error': 'Invalid or expired OTP'}, status=status.HTTP_400_BAD_REQUEST)
 
             if user is None:
-                return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
+                user_data = {
+                    'email': email if login_type == 'email' else None,
+                    'mobile': mobile if login_type == 'mobile' else None,
+                    'user_type': user_type,
+                }
+                print(f"User data:{user_data}")
+                serializer = FarmerRegistrationSerializer(data=user_data, user_type=user_type)
+                if serializer.is_valid():
+                    user = serializer.save()
+                    is_existing_user=False
+                    print(f"Serializer validated data: {serializer.validated_data}")
+                else:
+                    print(f"Serializer errors: {serializer.errors}")
+                    return Response({'error': 'Failed to create user'}, status=status.HTTP_400_BAD_REQUEST)
+            else:
+                is_existing_user = FarmerProfile.objects.filter(user=user).exists()
+                print(f"User in Record :{is_existing_user}")
 
-            otp_record = OTPVerification.objects.filter(user=user, otp=otp).order_by('-expires_at').first()
+            if user is None:
+                return Response({'error': 'User not found or created'}, status=status.HTTP_400_BAD_REQUEST)
 
-            if otp_record is None:
-                return Response({'error': 'Invalid OTP'}, status=status.HTTP_400_BAD_REQUEST)
+            with transaction.atomic():
+                farmer_profile, created = FarmerProfile.objects.get_or_create(user=user)
+                print(f"Farmer Record Created :{farmer_profile}")
 
-            if otp_record.expires_at < timezone.now():
-                return Response({'error': 'OTP has expired'}, status=status.HTTP_400_BAD_REQUEST)
+            tokens = create_farmer_token(user, user_type)
+            print(f"Tokens: {tokens}")
+            ip_address = request.META.get('REMOTE_ADDR')
 
-
-            otp_record.delete() 
+            update_farmer_info(user, user_type, ip_address, mobile=mobile if login_type == 'mobile' else None, is_new=not is_existing_user)
+            otp_record.delete()
 
             return Response({
                 'message': 'OTP verified successfully',
-                'is_authenticated': True
+                'is_authenticated': True,
+                'is_existing_user': is_existing_user,
+                'tokens': tokens,
             }, status=status.HTTP_200_OK)
 
         except Exception as e:
@@ -275,6 +322,85 @@ class FarmerFpoPart(APIView):
                 'details': str(e),
                 'traceback': traceback.format_exc()
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
+###############-------------------------------Get ALL States----------------############
+class GetallStates(APIView):
+    permission_classes=[IsAuthenticated]
+    def get(self,request):
+        user=request.user
+        print(f"User is {user.user_type}")
+        try:
+            user_language=request.query_params.get('user_language')
+            if user.user_type=="farmer":
+
+                try:
+                    data=StateMaster.objects.filter(fk_language_id=user_language)
+                except StateMaster.DoesNotExist:
+                    return Response({'status': 'error', 'msg': 'No such Data Found'}, status=status.HTTP_404_NOT_FOUND)
+                states_serializer=StatesSerializer(data,many=True)
+                print(f"States Data: {states_serializer.data}")
+                return Response({'success': 'ok','data': states_serializer.data}, status=status.HTTP_200_OK)
+            else:
+                return Response({'error': 'User type is not farmer'}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            error_message = str(e)
+            trace = traceback.format_exc()
+            return Response(
+                {
+                    "status": "error",
+                    "message": "An unexpected error occurred",
+                    "error_message": error_message,
+                    "traceback": trace
+                },
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+#############################################---------------------------Get Crop Variety Details----------------################
+class GetCropVariety(APIView):
+    permission_classes=[IsAuthenticated]
+    def get(self, request):
+        user=request.user
+        print(f"User is '{user.user_type}")
+        try:
+            if user.user_type=="farmer":
+                crop_id=request.query_params.get('crop_id')
+                user_language=request.query_params.get('user_language')
+                variety=CropVariety.objects.filter(fk_crops_id=crop_id,fk_language_id=user_language)
+                return Response({'message':'success','data':list(variety.values())}, status=200)
+            else:
+                return Response({'message':'Only Farmer can access this data'}, status=403)
+        except Exception as e:
+            return Response({'error': 'An error occurred.', 'details': str(e), 'traceback': traceback.format_exc()}, status=500)
+################------------------------------Get State Wise District------------------#########
+class GetStateWiseDistrict(APIView):
+    permission_classes=[IsAuthenticated]
+    def get(self, request):
+        user=request.user
+        print(f"User is {user.user_type}")
+        try:
+            state = request.query_params.get('state')
+            user_language = request.query_params.get('user_language')
+
+            if not state or not user_language:
+                return Response({'error': 'State and user_language are required fields.'}, status=status.HTTP_400_BAD_REQUEST)
+            if user.user_type=="farmer":
+                districts = DistrictMaster.objects.filter(fk_state_id=state, fk_language_id=user_language)
+                serializer = DistrictMasterSerializer(districts, many=True)
+                return Response({'success': 'Ok', 'data': serializer.data}, status=status.HTTP_200_OK)
+            else:
+                return Response({'error': 'User type is not farmer'}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            error_message = str(e)
+            trace = traceback.format_exc()
+            return Response(
+                {
+                    "status": "error",
+                    "message": "An unexpected error occurred",
+                    "error_message": error_message,
+                    "traceback": trace
+                },
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 #################--------------------------------------------Service Providers-----------------------------########################
 class ServiceProviderList(APIView):
     permission_classes = [IsAuthenticated]
@@ -432,7 +558,7 @@ class FarmerAddGetallLandInfo(APIView):
                     farmer=FarmerProfile.objects.get(user=user)
                 except FarmerProfile.DoesNotExist:
                     return Response({'status':'error','message':'Farmer not Found'})
-                farmer_lands = FarmerLandAddress.objects.filter(fk_farmer_id=farmer)
+                farmer_lands = FarmerLandAddress.objects.filter(fk_farmer=farmer)
                 serializer = FarmerLandAddressSerializer(farmer_lands, many=True)
                 return Response({'data': serializer.data},status=status.HTTP_200_OK)
         except Exception as e:
@@ -470,10 +596,47 @@ class FarmerAddGetallLandInfo(APIView):
                 lat1=request.data.get('lat1', None),
                 lat2=request.data.get('lat2', None),
                 fk_variety_id=request.data.get('variety_id',None),
-                is_land=request.data.get('is_land',None)
+                his_land=request.data.get('is_land',None)
             )
             land_address.save()
             return Response({'status':'success','message':'Land added successfully'},status=status.HTTP_200_OK)
+        except Exception as e:
+            error_message = str(e)
+            trace = traceback.format_exc()
+            return Response(
+                {
+                    "status": "error",
+                    "message": "An unexpected error occurred",
+                    "error_message": error_message,
+                    "traceback": trace
+                },
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+    def put(self, request,format=None):
+        user = request.user
+        print(f"User is {user.user_type}")
+        try:
+            data=request.data
+            land_id=data.get('land_id')
+            if not land_id:
+                return Response({'status':'error','message':'Land ID is required'},status=status.HTTP_400_BAD_REQUEST)
+            if user.user_type == 'farmer':
+                try:
+                    farmer_profile=FarmerProfile.objects.get(user=user)
+                except FarmerProfile.DoesNotExist:
+                    return Response({'status':'error','message':'Farmer not Found'})
+                try:
+                    land_address=FarmerLandAddress.objects.get(id=land_id,fk_farmer=farmer_profile)
+                except FarmerLandAddress.DoesNotExist:
+                    return Response({'status':'error','message':'Land not Found'})
+                land_address_data = ['address', 'pincode', 'fk_state_id', 'fk_district_id', 'village', 'fk_crops_id', 'land_area', 'lat1', 'lat2', 'fk_variety_id', 'is_land']
+                for field in land_address_data:
+                    if field in data:
+                        setattr(land_address, field, data[field])
+                land_address.save()
+                return Response({'status':'success','message':'Land added successfully'},status=status.HTTP_200_OK)
+            else:
+                return Response({'status':'error','message':'You are not authorized to perform this action'})
         except Exception as e:
             error_message = str(e)
             trace = traceback.format_exc()
@@ -496,7 +659,6 @@ class FarmerDetailsGetUpdate(APIView):
         print(f"User is {user.user_type}")
         try:
             data=request.data
-            land_id = data.get('land_id', None)
             if user.user_type == 'farmer':
                 try:
                     farmer_profile=FarmerProfile.objects.get(user=user)
@@ -510,18 +672,9 @@ class FarmerDetailsGetUpdate(APIView):
                 if "email" in data:
                     user.email=data["email"]
                     user.save()
-            
-                land_data = ['land_area', 'address', 'fk_state_id', 'fk_district_id', 'village', 'fk_crops_id','sowing_date',
-                             'fk_variety_id','his_land']
-                farmer_land, created = FarmerLandAddress.objects.get_or_create(fk_farmer=farmer_profile,id=land_id)
-                for field in land_data:
-                    if field in data:
-                        setattr(farmer_land, field, data[field])
-            
-           
                 farmer_profile.save()
-                farmer_land.save()
-                return Response({'status':'success','message': 'Farmer profile & Land updated successfully'})
+             
+                return Response({'status':'success','message': 'Farmer profile Updated successfully'})
             else:
                 return Response({'status':'error','message':'Invalid User'})
         except Exception as e:
@@ -543,7 +696,7 @@ class FarmerDetailsGetUpdate(APIView):
             land_id = request.query_params.get('land_id')
             if not land_id:
                 return Response({'status':'error','message':'Land ID is required'})
-            if user.user_type == 'fpo':
+            if user.user_type == 'farmer':
                 try:
                     farmer_profile=FarmerProfile.objects.get(user=user)
                 except FarmerProfile.DoesNotExist:

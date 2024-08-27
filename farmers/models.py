@@ -129,7 +129,9 @@ class CropVariety(models.Model):
     fk_crops=models.ForeignKey(CropMaster,blank=True,null=True,on_delete=models.CASCADE)
     created_at=models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    fk_language = models.ForeignKey(LanguageSelection, on_delete=models.CASCADE, null=True, blank=True)
     variety=models.CharField(max_length=100,null=True,blank=True)
+
 
 ##########################----------------------------FARMER Profile-------------------------------###########################
 def validate_mobile_no(value):
@@ -177,7 +179,7 @@ class FarmerProfile(models.Model):
         self.badgecolor = self.updateBadgeColor(self.coins)
         self.save()
 class OTPVerification(models.Model):
-    user = models.ForeignKey(CustomUser, on_delete=models.CASCADE)
+    mobile = models.CharField(null=True, blank=True, max_length=10, validators=[validate_mobile_no], unique=True)
     otp = models.CharField(max_length=6)
     created_at = models.DateTimeField(auto_now_add=True)
     expires_at = models.DateTimeField()
