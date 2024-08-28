@@ -735,7 +735,7 @@ class GetFarmProfileDetails(APIView):
                 except FarmerProfile.DoesNotExist:
                     return Response({'status':'error','message':'Farmer not Found'})
 
-                serializer=FarmerProfileSerializer(farmer_profile,many=True)
+                serializer=FarmerProfileSerializer(farmer_profile)
                 return Response({'data': serializer.data}, status=status.HTTP_200_OK)
             else:
                 return Response({'status':'error','message':'You are not authorized to perform this action'})
