@@ -372,6 +372,54 @@ class FarmerByFPO(APIView):
                 },
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+    def put(self, request):
+        user=request.user
+        try:
+            data = request.data
+            farmer_id = data.get('farmer_id')
+            if not farmer_id :
+                return Response({'status': 'error', 'msg': 'Missing required fields'}, status=status.HTTP_400_BAD_REQUEST)
+            if user.user_type=="farmer":
+                try:
+                    farmer = FarmerProfile.objects.get(user=user,fpo_name_id=farmer_id)
+                except FarmerProfile.DoesNotExist:
+                    return Response({'status': 'error', 'msg': 'Farmer does not exist'}, status=status.HTTP_404_NOT_FOUND)
+                if 'farmer_name' in data:
+                    farmer.name = data.get('farmer_name')
+
+                if 'farmer_mobile' in data:
+                    farmer_mobile = data.get('farmer_mobile')
+                    farmer.mobile = farmer_mobile
+                    user.mobile = farmer_mobile  
+                    user.save()
+                if 'farmer_village' in data:
+                    farmer.village = data.get('farmer_village')
+
+                if 'farmer_block' in data:
+                    farmer.block = data.get('farmer_block')
+
+                if 'farmer_district' in data:
+                    farmer.district = data.get('farmer_district')
+			
+
+                farmer.save()
+
+                return Response({'message': 'Farmer updated successfully', 'farmer_id': farmer.id}, status=status.HTTP_200_OK)
+            else:
+                return Response({'status': 'error', 'msg': 'Only FPO can update farmer profile'}, status=status.HTTP_403_FORBIDDEN)
+
+        except Exception as e:
+            error_message = str(e)
+            trace = traceback.format_exc()
+            return Response(
+                {
+                    "status": "error",
+                    "message": "An unexpected error occurred",
+                    "error_message": error_message,
+                    "traceback": trace
+                },
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
         
 ############################----------------------Addd Farmers CSV------------------------##############
 class AddFarmerCsv(APIView):
