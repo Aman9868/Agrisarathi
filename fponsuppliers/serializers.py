@@ -38,7 +38,7 @@ class FPOProfileSerializer(serializers.ModelSerializer):
   district=serializers.SerializerMethodField()
   class Meta:
     model = FPO
-    fields = ['fpo_id', 'mobile', 'fpo_name','state','district']
+    fields = ['fpo_id', 'mobile', 'fpo_name','state','district','profile','address']
   def get_state(self,obj):
         return obj.fk_state.state if obj.fk_state else None
   def get_district(self,obj):

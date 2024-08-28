@@ -47,7 +47,7 @@ class FPO(models.Model):
     mobile = models.CharField(null=True, blank=True, max_length=10, validators=[validate_mobile_no], unique=True)
     fpo_name=models.CharField(max_length=100,null=True, blank=True)
     email = models.EmailField(null=True,blank=True)
-    profile = models.FileField(upload_to="shop/fpo_profile", blank=True, null=True)
+    profile = models.FileField(upload_to="fpo_profile", blank=True, null=True)
     address = models.TextField(null=True, blank=True)
     password = models.CharField(max_length=128)
     fk_state = models.ForeignKey('farmers.StateMaster',on_delete=models.CASCADE,null=True,blank=True)
