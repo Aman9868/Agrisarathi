@@ -20,6 +20,10 @@ urlpatterns = [
     path('GetCropVariety',GetCropVariety.as_view(), name='GetCropVariety'),
     path('GetFarmProfileDetails',GetFarmProfileDetails.as_view(), name='GetFarmProfileDetails'),
 
+    #######################----------------------------NEWS-------------------------###############
+    path('GetCurrentNews',GetCurrentNews.as_view(), name='GetCurrentNews'),
+    path('GetCurrentNewsbyID',GetCurrentNewsbyID.as_view(), name='GetCurrentNewsbyID'),
+    
     ########---Get Farmer Single Land Details ,Update FarmerDetails-------##
     path('FarmerDetailsGetUpdate',FarmerDetailsGetUpdate.as_view(),name='FarmerDetailsGetUpdate'),
 
