@@ -324,13 +324,13 @@ class FarmerByFPO(APIView):
             if user.user_type=='fpo':
                 fpo=FPO.objects.get(user=user)
                 user=CustomUser.objects.create(mobile=farmer_mobile,user_type='farmer')
-                if FarmerProfile.objects.filter(mobile_no=farmer_mobile).exists():
+                if FarmerProfile.objects.filter(mobile=farmer_mobile).exists():
                     return Response({'message': 'Mobile number already exists'}, status=status.HTTP_400_BAD_REQUEST)
                 farmer = FarmerProfile.objects.create(
                 user=user,
                 fpo_name=fpo,
                 name=farmer_name,
-                mobile_no=farmer_mobile,
+                mobile=farmer_mobile,
                 village=farmer_village,
                 block=farmer_block,
                 district=farmer_district,
@@ -397,9 +397,9 @@ class AddFarmerCsv(APIView):
 
                 for index, row in df.iterrows():
                     try:
-                        mobile_no = str(row['mobile_number']).strip()
-                        if len(mobile_no) != 10 or not mobile_no.isdigit():
-                            errors.append(f'Row {index + 1}: Invalid mobile number: {mobile_no}')
+                        mobile = str(row['mobile_number']).strip()
+                        if len(mobile) != 10 or not mobile.isdigit():
+                            errors.append(f'Row {index + 1}: Invalid mobile number: {mobile}')
                             continue
 
                         name = str(row['name']).strip() if not pd.isna(row['name']) else ''
@@ -422,20 +422,20 @@ class AddFarmerCsv(APIView):
                             errors.append(f'Row {index + 1}: District name too long: {district}')
                             continue
 
-                        if not FarmerProfile.objects.filter(mobile_no=mobile_no, fpo_name=fpo_profile).exists():
-                            user=CustomUser.objects.create(mobile_no=mobile_no,user_type='farmer')
+                        if not FarmerProfile.objects.filter(mobile=mobile, fpo_name=fpo_profile).exists():
+                            user=CustomUser.objects.create(mobile=mobile,user_type='farmer')
                             FarmerProfile.objects.create(
                                 user=user,
                                 fpo_name=fpo_profile,
                                 name=name,
-                                mobile_no=mobile_no,
+                                mobile=mobile,
                                 village=village,
                                 block=block,
                                 district=district
                             )
                             successful_records.append(f'Row {index + 1}: Farmer added successfully')
                         else:
-                            errors.append(f'Row {index + 1}: Farmer with mobile number {mobile_no} already exists')
+                            errors.append(f'Row {index + 1}: Farmer with mobile number {mobile} already exists')
 
                     except Exception as e:
                         errors.append(f'Row {index + 1}: {str(e)}')
@@ -479,7 +479,7 @@ class GetSingleFarmerDetailsbyFPO(APIView):
                     farmers_data.append({
                     'farmer_id': farmer.id,
                     'farmer_name': farmer.name,
-                    'farmer_mobile': farmer.mobile_no,
+                    'farmer_mobile': farmer.mobile,
                     'farmer_district': farmer.district,
                     'farmer_village':farmer.village,
                     'farmer_block':farmer.block,
@@ -518,7 +518,7 @@ class GetAllFarmerbyFPO(APIView):
                     farmers_data.append({
                      'farmer_id': farmer.id,
                     'farmer_name': farmer.name,
-                    'farmer_mobile': farmer.mobile_no,
+                    'farmer_mobile': farmer.mobile,
                     'farmer_district': farmer.district,
                     'farmer_village':farmer.village,
                     'farmer_block':farmer.block,
@@ -1559,7 +1559,7 @@ class CheckCustomerisFarmerornot(APIView):
                 except FPO.DoesNotExist:
                     return Response({'error': 'FPO details not found'}, status=status.HTTP_404_NOT_FOUND)
                 try:
-                    farmer_status=FarmerProfile.objects.get(mobile_no=mobile_no,fk_fpo=fpo_profile).exists()
+                    farmer_status=FarmerProfile.objects.get(mobile=mobile_no,fk_fpo=fpo_profile).exists()
                     return Response({'message': 'Farmer mobile number is associated with the FPO', 'associated': True},
                                 status=status.HTTP_200_OK)
                 except FarmerProfile.DoesNotExist:
@@ -1593,7 +1593,7 @@ class CheckBuyerisFarmerorNot(APIView):
                 if filter_type == "active":
                     farmers = FarmerProfile.objects.filter(fpo_name=fpo_profile)
                     print(f"Farmer Object:{farmers}")
-                    mobile_numbers = farmers.values_list('mobile_no', flat=True)
+                    mobile_numbers = farmers.values_list('mobile', flat=True)
                     print(f"Farmer Mobile No:{mobile_numbers}")
                     customers = CustomerDetails.objects.filter(fk_fpo=fpo_profile, mobile_no__in=mobile_numbers).distinct()
                     print(f"Customers Details:{customers}")
@@ -1602,12 +1602,12 @@ class CheckBuyerisFarmerorNot(APIView):
                 elif filter_type == "all":
                     farmers = FarmerProfile.objects.filter(fpo_name=fpo_profile).distinct()
                     print(f"Farmer Object:{farmers}")
-                    unique_customers = {(farmer['name'], farmer['mobile_no']): {'buyer_name': farmer['name'], 'mobile_no': farmer['mobile_no']} for farmer in farmers.values('name', 'mobile_no')}
+                    unique_customers = {(farmer['name'], farmer['mobile']): {'buyer_name': farmer['name'], 'mobile_no': farmer['mobile_no']} for farmer in farmers.values('name', 'mobile_no')}
 
                 elif filter_type == "inactive":
                     farmers = FarmerProfile.objects.filter(fpo_name=fpo_profile)
                     print(f"Farmer Object:{farmers}")
-                    mobile_numbers = farmers.values_list('mobile_no', flat=True)
+                    mobile_numbers = farmers.values_list('mobile', flat=True)
                     print(f"Farmer Mobile No:{mobile_numbers}")
                     customers = CustomerDetails.objects.filter(fk_fpo=fpo_profile).exclude(mobile_no__in=mobile_numbers).distinct()
                     print(f"Customers Details:{customers}")
