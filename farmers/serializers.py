@@ -41,7 +41,7 @@ class FarmerProfileSerializer(serializers.ModelSerializer):
 ##############################---------------------------Farm land Serializers-----------------########
 class FarmerLandAddressSerializer(serializers.ModelSerializer):
     state = serializers.CharField(source='fk_state.state', read_only=True)
-    crop_id = serializers.CharField(source='fk_crops.id', read_only=True)
+    crop_id = serializers.IntegerField(source='fk_crops.id', read_only=True)
     district = serializers.CharField(source='fk_district.district', read_only=True)
     crop = serializers.CharField(source='fk_crops.crop_name', read_only=True)
     crop_images=serializers.SerializerMethodField()
