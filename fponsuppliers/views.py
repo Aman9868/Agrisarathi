@@ -929,9 +929,9 @@ class ADDProductDetailsCSV(APIView):
                         'expiry_date': row.get('expiry_date')
                     }
 
-                    if producttype in [1, 3]:
+                    if producttype in ["1", "3"]:
                         product_data['manufacturerName'] = row.get('manufacturerName', ' ')
-                    elif producttype == 2:
+                    elif producttype == "2":
                         product_data['fk_crops_id'] = row.get('crop_id')
                         product_data['fk_variety_id'] = row.get('variety')
 
