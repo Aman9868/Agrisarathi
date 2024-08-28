@@ -153,6 +153,11 @@ class DiseaseImagesMasterSerializer(serializers.ModelSerializer):
     class Meta:
         model = Disease_Images_Master
         fields = ['disease_file']
+
+class DiseaseVideoSerializer(serializers.ModelSerializer):
+    class Meta:
+        model=DiseaseVideo
+        fields='__all__'
 #######################---------------------Govt Schemes Seralizer---------------------################
 class GovtSchemesSerializer(serializers.ModelSerializer):
     state = serializers.CharField(source='fk_state.state', default=None)

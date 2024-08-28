@@ -1305,6 +1305,31 @@ class DetectDiseaseAPIView(APIView):
                 },
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+#############################----------------------Disease Vdieo--------------------##################
+class GetDiseaseVideo(APIView):
+    def get(self, request, *args, **kwargs):
+        try:
+            user = request.user
+            print(f"User is: {user.user_type}")
+            user_language = request.query_params.get('user_language')
+            if not user_language:
+                return Response({'message': 'user_language is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+            if user.user_type == "farmer":
+                try:
+                    farmer_profile = FarmerProfile.objects.get(user=user)
+                    print(f"Farmer Object: {farmer_profile}")
+                except FarmerProfile.DoesNotExist:
+                    return Response({'message': 'Farmer profile does not exist'}, status=status.HTTP_404_NOT_FOUND)
+
+                res = DiseaseVideo.objects.get(fk_language_id=user_language)
+                serializer = DiseaseVideoSerializer(res)
+                return Response({'message': 'success', 'data': serializer.data}, status=status.HTTP_200_OK)
+            else:
+                return Response({'message': 'Invalid user type'}, status=status.HTTP_403_FORBIDDEN)
+        
+        except Exception as e:
+            return JsonResponse({'message': 'An error occurred', 'error': traceback.format_exc()}, status=500)
 ######################----------------------------------------Get Single Diagnosis Report--------------------##############      
 class GetSingleDiagnosisReport(APIView):
     permission_classes = [IsAuthenticated]

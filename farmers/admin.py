@@ -418,7 +418,7 @@ class DiseaseProductInfoAdmin(admin.ModelAdmin):
         return obj.fk_product.productName if obj.fk_product else None
     getproduct_name.short_description = 'Product Name'
 
-
+##############################-------------------------NEWS-----------------------------#############
 @admin.register(CurrentNews)
 class CurrentNewsAdmin(admin.ModelAdmin):
     list_display = ('title', 'created_at', 'getlanguage')
@@ -426,3 +426,8 @@ class CurrentNewsAdmin(admin.ModelAdmin):
     def getlanguage(self,obj):
         return obj.fk_language.language if obj.fk_language else None
     getlanguage.short_description='Language'
+
+###########################-------------------------------Disease Vdieo--------------------###########
+@admin.register(DiseaseVideo)
+class DiseaseVideoAdmin(admin.ModelAdmin):
+    list_display=('fk_language','video')
