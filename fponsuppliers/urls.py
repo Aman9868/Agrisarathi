@@ -15,6 +15,7 @@ urlpatterns = [
     path('api/token/refresh/',TokenRefreshView.as_view(), name='token_refresh'),
     path('GetSingleFarmerDetailsbyFPO',GetSingleFarmerDetailsbyFPO.as_view(), name='GetSingleFarmerDetailsbyFPO'),
     path('GetAllFarmerbyFPO',GetAllFarmerbyFPO.as_view(), name='GetAllFarmerbyFPO'),
+    path('ADDProductDetailsCSV',ADDProductDetailsCSV.as_view(), name='ADDProductDetailsCSV'),
     # add product supplier/fpo   # get single productinfo supplier/fpo # del product info # update
     path('ProductDetailsAddGetDelUpdate',ProductDetailsAddGetDelUpdate.as_view(),name='ProductDetailsAddGetDelUpdate'),
     path('PurchaseInfo',PurchaseInfo.as_view(),name='PurchaseInfo'), 

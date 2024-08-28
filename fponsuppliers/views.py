@@ -880,6 +880,168 @@ class ProductDetailsAddGetDelUpdate(APIView):
                 },
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+        
+#####################-----------------------ADD PRODUCT CSV------------------------------##############
+class ADDProductDetailsCSV(APIView):
+    permission_classes = [IsAuthenticated]
+    parser_classes = [MultiPartParser, FormParser]
+
+    def post(self, request, format=None):
+        user = request.user
+        print(f"User is {user.user_type}")
+
+        try:
+            file = request.FILES.get('file')
+            producttype = request.data.get('producttype')
+            print(f"Product Type is :{producttype}")
+
+            if not file:
+                return Response({'error': 'Excel file is required'}, status=status.HTTP_400_BAD_REQUEST)
+            if not producttype:
+                return Response({'error': 'Product type is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+            # Read the Excel file using pandas
+            df = pd.read_excel(file)
+
+            for _, row in df.iterrows():
+                productname = row.get('productName')
+                if not productname:
+                    continue  # Skip rows with missing essential data
+
+                if user.user_type == 'fpo':
+                    try:
+                        fpo_profile = FPO.objects.get(user=user)
+                        print(f"Fpo Profile : {fpo_profile}")
+                    except FPO.DoesNotExist:
+                        return Response({'error': 'FPO details not found'}, status=status.HTTP_404_NOT_FOUND)
+
+                    product_data = {
+                        'productName': productname,
+                        'productDescription': row.get('productDescription', ' '),
+                        'composition': row.get('composition', ' '),
+                        'measurement_type': row.get('measurement_type'),
+                        'measurement_unit': row.get('measurement_unit'),
+                        'selling_status': row.get('selling_status'),
+                        'Category': row.get('Category'),
+                        'quantity': row.get('quantity'),
+                        'fk_productype_id': producttype,
+                        'fk_fpo': fpo_profile,
+                        'expiry_date': row.get('expiry_date')
+                    }
+
+                    if producttype in [1, 3]:
+                        product_data['manufacturerName'] = row.get('manufacturerName', ' ')
+                    elif producttype == 2:
+                        product_data['fk_crops_id'] = row.get('crop_id')
+                        product_data['fk_variety_id'] = row.get('variety')
+
+                    # FPO Supplier Information
+                    supplier = FPOSuppliers.objects.create(
+                        fk_fpo=fpo_profile,
+                        fk_productype_id=producttype,
+                        quantity=row.get('quantity'),
+                        total_amount=row.get('purchase_price'),
+                        party_name=row.get('party_name'),
+                        party_mobileno=row.get('mobileno'),
+                        party_company=row.get('company_name'),
+                        unit_price=row.get('unit_price'),
+                        party_gst=row.get('party_gst', ' ')
+                    )
+                    print(f"FPO Supplier Object:{supplier}")
+
+                    product = ProductDetails.objects.create(**product_data)
+                    print(f"Product Objects:{product}")
+                    product.fk_fposupplier = supplier
+                    product.save()
+
+                    # FPO Prices
+                    ProductPrices.objects.create(
+                        fk_product=product,
+                        purchase_price=row.get('purchase_price'),
+                        unit_price=row.get('unit_price'),
+                        final_price_unit=row.get('final_price'),
+                        fk_fpo=fpo_profile,
+                        fk_fposupplier=supplier
+                    )
+
+                    InventoryDetails.objects.create(
+                        fk_product=product,
+                        fk_fpo=fpo_profile,
+                        stock=row.get('quantity', 0),
+                        fk_fposupplier=supplier
+                    )
+
+                elif user.user_type == 'supplier':
+                    try:
+                        supplier_info = Supplier.objects.get(user=user)
+                        print(f"Supplier Info :{supplier_info}")
+                    except Supplier.DoesNotExist:
+                        return Response({'error': 'Supplier details not found'}, status=status.HTTP_404_NOT_FOUND)
+
+                    product_data = {
+                        'productName': productname,
+                        'productDescription': row.get('productDescription', ' '),
+                        'composition': row.get('composition', ' '),
+                        'measurement_type': row.get('measurement_type'),
+                        'measurement_unit': row.get('measurement_unit'),
+                        'selling_status': row.get('selling_status'),
+                        'Category': row.get('Category'),
+                        'quantity': row.get('quantity'),
+                        'fk_productype_id': producttype,
+                        'expiry_date': row.get('expiry_date', ' '),
+                        'manufacturerName': row.get('manufacturerName', ' '),
+                    }
+
+                    product = ProductDetails.objects.create(**product_data)
+                    print(f"Product Objects:{product}")
+                    product.fk_supplier.set([supplier_info])
+
+                    supplier = InputSuppliers.objects.create(
+                        fk_supplier=supplier_info,
+                        fk_productype_id=producttype,
+                        quantity=row.get('quantity'),
+                        total_amount=row.get('purchase_price'),
+                        party_name=row.get('party_name'),
+                        party_mobileno=row.get('mobileno'),
+                        party_company=row.get('company_name'),
+                        unit_price=row.get('unit_price'),
+                        party_gst=row.get('party_gst')
+                    )
+                    print(f"Supplier Inputs Supplier Info :{supplier}")
+
+                    product.fk_inputsupplier = supplier
+                    product.save()
+
+                    ProductPrices.objects.create(
+                        fk_product=product,
+                        fk_supplier=supplier_info,
+                        purchase_price=row.get('purchase_price'),
+                        unit_price=row.get('unit_price'),
+                        discount=row.get('discount', 0),
+                        final_price_unit=row.get('final_price'),
+                        fk_inputsupplier=supplier
+                    )
+
+                    InventoryDetails.objects.create(
+                        fk_product=product,
+                        stock=row.get('quantity', 0),
+                        fk_inputsupplier=supplier,
+                        fk_supplier=supplier_info
+                    )
+
+            return Response({'message': 'Products created & added successfully!'})
+        except Exception as e:
+            error_message = str(e)
+            trace = traceback.format_exc()
+            return Response(
+                {
+                    "status": "error",
+                    "message": "An unexpected error occurred",
+                    "error_message": error_message,
+                    "traceback": trace
+                },
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 #########################-------------------GET ALL Purchases Info by FPO/Suppliers---------------------#################
 class PurchaseInfo(APIView):
     permission_classes=[IsAuthenticated]
