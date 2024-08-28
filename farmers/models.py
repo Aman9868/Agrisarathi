@@ -53,7 +53,7 @@ class CurrentNews(models.Model):
     title=models.CharField(max_length=5000,null=True,blank=True)
     content=models.TextField(null=True,blank=True)
     created_at = models.DateField(null=True, blank=True)
-    image=models.FileField(upload_to="current_news/", blank=True, null=True)
+    image = models.ImageField(upload_to='article_images/', blank=True, null=True)
     related_post=models.CharField(max_length=100,null=True,blank=True)
     source=models.CharField(max_length=100,null=True,blank=True)
     link = models.CharField(null=True,blank=True,max_length=5000)
