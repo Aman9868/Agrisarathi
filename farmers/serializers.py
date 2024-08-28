@@ -40,9 +40,16 @@ class FarmerProfileSerializer(serializers.ModelSerializer):
         fields = '__all__'
 ##############################---------------------------Farm land Serializers-----------------########
 class FarmerLandAddressSerializer(serializers.ModelSerializer):
+    state = serializers.CharField(source='fk_state.state', read_only=True)
+    district = serializers.CharField(source='fk_district.district', read_only=True)
+    crop = serializers.CharField(source='fk_crops.crop_name', read_only=True)
+    crop_images=serializers.SerializerMethodField()
     class Meta:
         model = FarmerLandAddress
-        fields = '__all__'
+        fields = ['id', 'land_area', 'address', 'state', 'district', 'tehsil', 'crop','crop_images']
+    def get_crop_images(self, obj):
+        crop_images = CropImages.objects.filter(fk_cropmaster=obj.fk_crops)
+        return [image.crop_image.url for image in crop_images]
 ########################----------------------------Crop Type Serializers------------------###########
 class POPCropTypeSerializer(serializers.ModelSerializer):
     class Meta:

@@ -3,6 +3,7 @@ from rest_framework import serializers
 from rest_framework_simplejwt.tokens import RefreshToken,TokenError
 from .models import *
 from .managers import *
+from rest_framework.pagination import LimitOffsetPagination
 ####################-----------------------------------User Serializer*---------------#############
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
@@ -326,3 +327,8 @@ def format_inventory_details(inventory_items):
         'stock': item.stock,
         'stock_status': item.stock_status()
     } for item in inventory_items]
+
+#######################-----------------Getall farmers Pagination-----------------############
+class FarmersAllPagination(LimitOffsetPagination):
+    default_limit = 5 
+    max_limit = 100  
