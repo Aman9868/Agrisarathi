@@ -427,7 +427,3 @@ class CurrentNewsAdmin(admin.ModelAdmin):
         return obj.fk_language.language if obj.fk_language else None
     getlanguage.short_description='Language'
 
-###########################-------------------------------Disease Vdieo--------------------###########
-@admin.register(DiseaseVideo)
-class DiseaseVideoAdmin(admin.ModelAdmin):
-    list_display=('fk_language','video')
