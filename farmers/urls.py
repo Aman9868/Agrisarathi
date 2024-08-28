@@ -36,6 +36,7 @@ urlpatterns = [
     ##################----------------------Govt Schemes---------------------#######
     path('GetallGovtSchemes',GetallGovtSchemes.as_view(),name='GetallGovtSchemes'),
     path('GovtSchemesbyID',GovtSchemesbyID.as_view(),name='GovtSchemesbyID'),
+
     ####--------------------------------------Fertilizers Calculators------------------########
     path('Fertilizerswithtest',Fertilizerswithtest.as_view(),name='Fertilizerswithtest'),
     path('AdvanceFertilizercalculator',AdvanceFertilizercalculator.as_view(),name='AdvanceFertilizercalculator'),
