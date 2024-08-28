@@ -147,7 +147,7 @@ class UpdateProfile(APIView):
                 fpo_shop,_ = ShopDetails.objects.get_or_create(fk_fpo=fpo_profile)
 
                 fpo_fields = [
-                'mobile_no', 'fpo_name', 'address','state',
+                'mobile', 'fpo_name', 'address','state',
                 'district', 'village'
                 ]
                 bank_business_fields = [
@@ -182,7 +182,7 @@ class UpdateProfile(APIView):
                 supplier_shop,_ = ShopDetails.objects.get_or_create(fk_supplier=supplier_profile)
 
                 supplier_fields = [
-                'mobile_no','supplier_name', 'address','state',
+                'mobile','supplier_name', 'address','state',
                 'district', 'village']
                 bank_business_fields = [
                 'accountholder_name', 'account_number', 'bank_name', 'ifsc_code',

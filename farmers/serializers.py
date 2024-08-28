@@ -32,6 +32,12 @@ class FarmerRegistrationSerializer(serializers.ModelSerializer):
 
         print(f"Created {self.user_type} user: {user}")
         return user
+    
+#########---------------------------Farmer Profile---------------------###############
+class FarmerProfileSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = FarmerProfile
+        fields = '__all__'
 ##############################---------------------------Farm land Serializers-----------------########
 class FarmerLandAddressSerializer(serializers.ModelSerializer):
     class Meta:

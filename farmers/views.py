@@ -721,6 +721,36 @@ class FarmerDetailsGetUpdate(APIView):
                 },
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+        
+########################----------------------Farmer Profile Details-----------------------############
+class GetFarmProfileDetails(APIView):
+    permission_classes=[IsAuthenticated]
+    def get(self,request,format=None):
+        user=request.user
+        print(f"User is {user.user_type}")
+        try:
+            if user.user_type=="farmer":
+                try:
+                    farmer_profile=FarmerProfile.objects.get(user=user)
+                except FarmerProfile.DoesNotExist:
+                    return Response({'status':'error','message':'Farmer not Found'})
+
+                serializer=FarmerProfileSerializer(farmer_profile,many=True)
+                return Response({'data': serializer.data}, status=status.HTTP_200_OK)
+            else:
+                return Response({'status':'error','message':'You are not authorized to perform this action'})
+        except Exception as e:
+            error_message = str(e)
+            trace = traceback.format_exc()
+            return Response(
+                {
+                    "status": "error",
+                    "message": "An unexpected error occurred",
+                    "error_message": error_message,
+                    "traceback": trace
+                },
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 #############---------------------------------------DUKAAN---------------######################################
 #############---------------------------------------DUKAAN---------------######################################
 
