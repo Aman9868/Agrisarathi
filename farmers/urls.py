@@ -18,6 +18,7 @@ urlpatterns = [
     path('AddCropVariety',AddCropVariety,name='AddCropVariety'),
     path('GetStateWiseDistrict',GetStateWiseDistrict.as_view(), name='GetStateWiseDistrict'),
     path('GetCropVariety',GetCropVariety.as_view(), name='GetCropVariety'),
+    path('GetFarmProfileDetails',GetFarmProfileDetails.as_view(), name='GetFarmProfileDetails'),
 
     ########---Get Farmer Single Land Details ,Update FarmerDetails-------##
     path('FarmerDetailsGetUpdate',FarmerDetailsGetUpdate.as_view(),name='FarmerDetailsGetUpdate'),
