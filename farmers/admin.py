@@ -417,3 +417,12 @@ class DiseaseProductInfoAdmin(admin.ModelAdmin):
     def getproduct_name(self,obj):
         return obj.fk_product.productName if obj.fk_product else None
     getproduct_name.short_description = 'Product Name'
+
+
+@admin.register(CurrentNews)
+class CurrentNewsAdmin(admin.ModelAdmin):
+    list_display = ('title', 'created_at', 'getlanguage')
+    list_filter = ('fk_language', 'created_at','source')
+    def getlanguage(self,obj):
+        return obj.fk_language.language if obj.fk_language else None
+    getlanguage.short_description='Language'
