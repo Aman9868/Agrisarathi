@@ -1150,7 +1150,7 @@ class DetectDiseaseAPIView(APIView):
 
             if user.user_type == "farmer":
                 try:
-                    farmer_profile = FarmerProfile.objects.get(user=user)
+                    farmer_profile = FarmerProfile.objects.get(user=user,fk_language_id=user_language)
                     farmer_profile.add_coins(10)
                     farmer_profile.save()
                 except FarmerProfile.DoesNotExist:
