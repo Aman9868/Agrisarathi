@@ -887,7 +887,7 @@ class CommentOnPost(APIView):
                 'status': 'success',
                 'msg': 'Comment Added Successfully',
                 'comment': {
-                    'comment_id': comment.id,
+                    'id': comment.id,
                     'post_id': comment.fk_post.id,
                     'user_id': user.id,
                     'user_name': user.name,
@@ -975,104 +975,79 @@ class ReplyOnPostComment(APIView):
 ###########################---------------------------Like Post By Differente uSers---------------######################
 class LikeUnlikePost(APIView):
     permission_classes = [IsAuthenticated]
+
     def post(self, request):
-        user=request.user
-        print(f"User is {user.user_type}")
+        user = request.user
+        user_type = request.data.get("user_type")
+        fk_post_id = request.data.get("fk_post_id")
+        action = request.data.get("action")  # 'like' or 'unlike'
+        
+        if user_type not in ["farmer", "fpo"]:
+            return Response({"status": "error", "msg": "Invalid user type"}, status=status.HTTP_400_BAD_REQUEST)
+        
         try:
-            fk_post_id = request.data.get('fk_post_id')
-            user_type = request.data.get('user_type')
-            action = request.data.get('action')  
-            if not all([fk_post_id,user_type, action]):
-                return Response({'status': 0, 'msg': 'Missing required fields'}, status=status.HTTP_400_BAD_REQUEST)
+            post = CommunityPost.objects.get(id=fk_post_id)
+        except CommunityPost.DoesNotExist:
+            return Response({"status": "error", "msg": "Post not found"}, status=status.HTTP_404_NOT_FOUND)
 
-            if action not in ['like', 'unlike']:
-                return Response({'status': 0, 'msg': 'Invalid action'}, status=status.HTTP_400_BAD_REQUEST)
+        if user_type == "farmer":
+            user_profile = FarmerProfile.objects.get(user=user)
+        else:
+            user_profile = FPO.objects.get(user=user)
 
-            if not CommunityPost.objects.filter(id=fk_post_id).exists():
-                return Response({'status': 0, 'msg': 'Post does not exist'}, status=status.HTTP_404_NOT_FOUND)
-            if user.user_type=="farmer" and  user_type == "farmer":
-                try:
-                    farmer_profile=FarmerProfile.objects.get(user=user)
-                except FarmerProfile.DoesNotExist:
-                    return Response({'status': 0, 'msg': 'Farmer profile does not exist'}, status=status.HTTP_404_NOT_FOUND)
-                
-                post_like, created = PostsLike.objects.get_or_create(fk_post_id=fk_post_id, fk_user=farmer_profile)
-            elif user.user_type=="fpo" and user_type == "fpo":
-                try:
-                    fpo_profile=FPO.objects.get(user=user)
-                except FPO.DoesNotExist:
-                    return Response({'status': 0, 'msg': 'FPO profile does not exist'}, status=status.HTTP_404_NOT_FOUND)
-                post_like, created = PostsLike.objects.get_or_create(fk_post_id=fk_post_id, fk_fpo=fpo_profile)
+        like_record, created = PostsLike.objects.get_or_create(
+            fk_post=post,
+            fk_user=user_profile if user_type == "farmer" else None,
+            fk_fpo=user_profile if user_type == "fpo" else None
+        )
+
+        if action == "like":
+            if created:  # If the like record was created
+                like_record.created_at = timezone.now()
+                like_record.save()
+                post_like_count = PostsLike.objects.filter(fk_post=post).count()
+                return Response({"status": "success", "msg": "Post liked", "like_count": post_like_count}, status=status.HTTP_200_OK)
             else:
-                return Response({'status': 0, 'msg': 'Invalid user type'}, status=status.HTTP_400_BAD_REQUEST)
-
-            if action == 'like':
-                if created or post_like.like_count == 0:
-                    post_like.like_count = 1
-                    post_like.created_at = datetime.now()
-                    post_like.save()
-                    return Response({'status': 1, 'msg': 'Post liked successfully'}, status=status.HTTP_200_OK)
-                else:
-                    return Response({'status': 0, 'msg': 'Post already liked'}, status=status.HTTP_400_BAD_REQUEST)
-            else:  # unlike
-                if post_like.like_count > 0:
-                    post_like.like_count = 0
-                    post_like.save()
-                    return Response({'status': 1, 'msg': 'Post unliked successfully'}, status=status.HTTP_200_OK)
-                else:
-                    return Response({'status': 0, 'msg': 'Post not liked'}, status=status.HTTP_400_BAD_REQUEST)
-
-        except Exception as e:
-            error_message = str(e)
-            trace = traceback.format_exc()
-            return Response(
-                {
-                    "status": "error",
-                    "message": "An unexpected error occurred",
-                    "error_message": error_message,
-                    "traceback": trace
-                },
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
+                return Response({"status": "error", "msg": "Post already liked"}, status=status.HTTP_400_BAD_REQUEST)
+        
+        elif action == "unlike":
+            if not created:  # If the like record was not newly created
+                like_record.delete()
+                post_like_count = PostsLike.objects.filter(fk_post=post).count()
+                return Response({"status": "success", "msg": "Post unliked", "like_count": post_like_count}, status=status.HTTP_200_OK)
+            else:
+                return Response({"status": "error", "msg": "Post not liked before"}, status=status.HTTP_400_BAD_REQUEST)
+        
+        else:
+            return Response({"status": "error", "msg": "Invalid action"}, status=status.HTTP_400_BAD_REQUEST)
 #################################-------------------Get ALL Info about POST-------------------##################
 class CommunityPostsList(APIView):
     permission_classes = [IsAuthenticated]
+
     def get(self, request):
         user = request.user
+        user_profile = None
         try:
             if user.user_type == "farmer":
-                try:
-                    user_profile = FarmerProfile.objects.get(user=user)
-                except FarmerProfile.DoesNotExist:
-                    return Response({'status': 'error', 'msg': 'Farmer profile does not exist'}, status=status.HTTP_404_NOT_FOUND)
+                user_profile = FarmerProfile.objects.get(user=user)
             elif user.user_type == "fpo":
-                try:
-                    user_profile = FPO.objects.get(user=user)
-                except FPO.DoesNotExist:
-                    return Response({'status': 'error', 'msg': 'FPO profile does not exist'}, status=status.HTTP_404_NOT_FOUND)
+                user_profile = FPO.objects.get(user=user)
             else:
                 return Response({'status': 'error', 'msg': 'Invalid user type'}, status=status.HTTP_400_BAD_REQUEST)
-
-            filter_type = request.query_params.get('filter_type', 'all')
             
+            filter_type = request.query_params.get('filter_type', 'all')
             if filter_type == 'farmer':
                 posts = CommunityPost.objects.filter(fk_user__isnull=False).order_by('-created_at')
-                if not posts.exists():
-                    return Response({'status': 'error', 'msg': 'No posts found by farmer'}, status=status.HTTP_200_OK)
             elif filter_type == 'fpo':
                 posts = CommunityPost.objects.filter(fk_fpo__isnull=False).order_by('-created_at')
-                if not posts.exists():
-                    return Response({'status': 'error', 'msg': 'No posts found by FPO'}, status=status.HTTP_200_OK)
-            else:  # 'all'
+            else:
                 posts = CommunityPost.objects.all().order_by('-created_at')
-                if not posts.exists():
-                    return Response({'status': 'error', 'msg': 'No posts found'}, status=status.HTTP_200_OK)
-
+            
             final_list = []
             for post in posts:
                 post_img = PostsMedia.objects.filter(fk_post_id=post.id).first()
-                like_objects = PostsLike.objects.filter(fk_post_id=post.id).order_by('-created_at')
-                is_liked = like_objects.filter(fk_user=user_profile).exists()
+                like_objects = PostsLike.objects.filter(fk_post_id=post.id)
+                is_liked = like_objects.filter(fk_user=user_profile).exists() if user_profile else False
                 
                 users_liked = [
                     {
@@ -1082,57 +1057,54 @@ class CommunityPostsList(APIView):
                     }
                     for like in like_objects
                 ]
-
+                
                 final_dict = {
                     "user_name": post.fk_user.name if post.fk_user else (post.fk_fpo.name if post.fk_fpo else ''),
                     'user_id': post.fk_user.id if post.fk_user else (post.fk_fpo.id if post.fk_fpo else ''),
                     "post_id": post.id,
-                    'profile_pic': post.fk_user.profile.url if post.fk_user and hasattr(post.fk_user, 'profile') and post.fk_user.profile else 
-                                   (post.fk_fpo.profile.url if post.fk_fpo and hasattr(post.fk_fpo, 'profile') and post.fk_fpo.profile else ''),
+                    'profile_pic': post.fk_user.profile.url if post.fk_user and hasattr(post.fk_user, 'profile') and post.fk_user.profile else (post.fk_fpo.profile.url if post.fk_fpo and hasattr(post.fk_fpo, 'profile') and post.fk_fpo.profile else ''),
                     'post_image': post_img.image_file.url if post_img and post_img.image_file else '',
                     'post_video': post_img.video_file.url if post_img and post_img.video_file else '',
                     'like_count': like_objects.count(),
                     'is_likedbysameuser': is_liked,
-                    'users_liked': users_liked,  
+                    'users_liked': users_liked,
                     'description': post.description if post.description else '',
-                    'created_dt': post.created_at if post.created_at else '',
+                    'created_at': post.created_at if post.created_at else '',
                     'comment_list': []
                 }
-
+                
                 comment_list = []
                 comment_objects = PostComments.objects.filter(fk_post_id=post.id).order_by('-created_at')
                 for comment in comment_objects:
                     comment_dict = {
                         'user_name': comment.fk_user.name if comment.fk_user else (comment.fk_fpo.name if comment.fk_fpo else ''),
                         'user_id': comment.fk_user.id if comment.fk_user else (comment.fk_fpo.id if comment.fk_fpo else ''),
-                        'profile_pic': comment.fk_user.profile.url if comment.fk_user and hasattr(comment.fk_user, 'profile') and comment.fk_user.profile else 
-                                       (comment.fk_fpo.profile.url if comment.fk_fpo and hasattr(comment.fk_fpo, 'profile') and comment.fk_fpo.profile else ''),
+                        'profile_pic': comment.fk_user.profile.url if comment.fk_user and hasattr(comment.fk_user, 'profile') and comment.fk_user.profile else (comment.fk_fpo.profile.url if comment.fk_fpo and hasattr(comment.fk_fpo, 'profile') and comment.fk_fpo.profile else ''),
                         'id': comment.id if comment.id else '',
                         'post_comment': comment.text if comment.text else '',
-                        'created_dt': comment.created_at if comment.created_at else '',
+                        'created_at': comment.created_at if comment.created_at else '',
                         'reply_comments': []
                     }
-
+                    
                     reply_list = []
                     reply_objects = CommentReply.objects.filter(fk_postcomment_id=comment.id).order_by('-created_at')
                     for reply in reply_objects:
                         reply_dict = {
                             'user_name': reply.fk_user.name if reply.fk_user else (reply.fk_fpo.name if reply.fk_fpo else ''),
                             'user_id': reply.fk_user.id if reply.fk_user else (reply.fk_fpo.id if reply.fk_fpo else ''),
-                            'profile_pic': reply.fk_user.profile.url if reply.fk_user and hasattr(reply.fk_user, 'profile') and reply.fk_user.profile else 
-                                           (reply.fk_fpo.profile.url if reply.fk_fpo and hasattr(reply.fk_fpo, 'profile') and reply.fk_fpo.profile else ''),
+                            'profile_pic': reply.fk_user.profile.url if reply.fk_user and hasattr(reply.fk_user, 'profile') and reply.fk_user.profile else (reply.fk_fpo.profile.url if reply.fk_fpo and hasattr(reply.fk_fpo, 'profile') and reply.fk_fpo.profile else ''),
                             'id': reply.id if reply.id else '',
                             'text': reply.text if reply.text else '',
-                            'created_dt': reply.created_at if reply.created_at else '',
+                            'created_at': reply.created_at if reply.created_at else '',
                         }
                         reply_list.append(reply_dict)
-
+                    
                     comment_dict['reply_comments'] = reply_list
                     comment_list.append(comment_dict)
-
+                
                 final_dict['comment_list'] = comment_list
                 final_list.append(final_dict)
-
+            
             return Response({'status': 'success', 'message': "Community post list", 'data': final_list}, status=status.HTTP_200_OK)
         
         except Exception as e:
