@@ -2,8 +2,10 @@
 from rest_framework import serializers
 from rest_framework_simplejwt.tokens import RefreshToken,TokenError
 from .models import *
+from farmers.models import FarmerProfile 
 from .managers import *
 from rest_framework.pagination import LimitOffsetPagination
+from rest_framework.pagination import PageNumberPagination
 ####################-----------------------------------User Serializer*---------------#############
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
@@ -278,19 +280,19 @@ class SupplierProductDetailSerializer(serializers.ModelSerializer):
     
 ######################-----------------------------------Sales by FPO/Suppliers-----------------------------#############
 class FPOCustomerDetailsSerializer(serializers.ModelSerializer):
-    customer_id=serializers.IntegerField(source='id')
+    customer_id = serializers.IntegerField(source='id', read_only=True)
     class Meta:
         model = CustomerDetails
         fields = ['customer_id','buyer_name', 'mobile_no', 'address', 'fk_fpo']
 
 class SupplierCustomerDetailsSerializer(serializers.ModelSerializer):
-    customer_id=serializers.IntegerField(source='id')
+    customer_id = serializers.IntegerField(source='id', read_only=True)
     class Meta:
         model = CustomerDetails
         fields = ['customer_id','buyer_name', 'mobile_no', 'address','fk_supplier']
 
 class ProductSaleSerializer(serializers.ModelSerializer):
-    sale_id=serializers.IntegerField(source='id')
+    sale_id=serializers.IntegerField(source='id',read_only=True)
     product_name = serializers.CharField(source='fk_invent.fk_product.productName', read_only=True)
     remaining_stock = serializers.IntegerField(source='fk_invent.stock', read_only=True)
     
@@ -299,13 +301,13 @@ class ProductSaleSerializer(serializers.ModelSerializer):
         fields = ['sale_id', 'product_name', 'final_price', 'remaining_stock']
 
 class FPOSalesRecordItemSerializer(serializers.ModelSerializer):
-    salesrecord_id=serializers.IntegerField(source='id')
+    salesrecord_id=serializers.IntegerField(source='id',read_only=True)
     class Meta:
         model = SalesRecordItem
         fields = ['salesrecord_id','name', 'quantity', 'total_amount', 'fk_fpo', 'sales_date', 'product_name', 'category', 'fk_fposupplier_id',
                   ]
 class SupplierSalesRecordItemSerializer(serializers.ModelSerializer):
-    salesrecord_id=serializers.IntegerField(source='id')
+    salesrecord_id=serializers.IntegerField(source='id',read_only=True)
     class Meta:
         model = SalesRecordItem
         fields = ['salesrecord_id','name', 'quantity', 'total_amount','sales_date', 'product_name', 'category', 
@@ -329,6 +331,37 @@ def format_inventory_details(inventory_items):
     } for item in inventory_items]
 
 #######################-----------------Getall farmers Pagination-----------------############
-class FarmersAllPagination(LimitOffsetPagination):
-    default_limit = 5 
-    max_limit = 100  
+class FarmersAllPagination(PageNumberPagination):
+    page_size = 10  
+    page_size_query_param = 'page_size'
+
+class FarmerProfileSerializer(serializers.ModelSerializer):
+    farmer_id = serializers.IntegerField(source='id')
+    farmer_name = serializers.CharField(source='name')
+    farmer_mobile = serializers.CharField(source='mobile')
+    farmer_district = serializers.CharField(source='district')
+    farmer_village = serializers.CharField(source='village')
+    farmer_block = serializers.CharField(source='block')
+    created_at = serializers.DateTimeField()
+
+    class Meta:
+        model = FarmerProfile
+        fields = ['farmer_id', 'farmer_name', 'farmer_mobile', 'farmer_district', 'farmer_village', 'farmer_block', 'created_at']
+
+##############################------------------------GET ALL Products Serializer----------------------############
+class GetallProductPagination(PageNumberPagination):
+    page_size = 10  
+    page_size_query_param = 'page_size'
+    max_page_size = 100 
+
+#####################-------------------------------GET ALL INventory---------------------------###############
+class GetallInventoryPagination(PageNumberPagination):
+    page_size = 10  
+    page_size_query_param = 'page_size'
+    max_page_size = 100 
+
+#################################----------------------GET ALL SALES ------------------------#####################
+class GetallSalesPagination(PageNumberPagination):
+    page_size = 10  
+    page_size_query_param = 'page_size'
+    max_page_size = 100 

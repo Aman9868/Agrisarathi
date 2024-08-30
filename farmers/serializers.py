@@ -182,13 +182,14 @@ class CurrentNewsPagination(LimitOffsetPagination):
 ########-----------------------------------------CROP SUGGESTion-----------------------#################
 class SuggestedCropSerializer(serializers.ModelSerializer):
     crop_image = serializers.SerializerMethodField()
+    crop_name=serializers.CharField(source='fk_crop.name', default=None)
     crop_audio = serializers.SerializerMethodField()
 
     class Meta:
         model = SuggestedCrop
         fields = [
             'fk_crop', 'season', 'description', 'weather_temperature', 'cost_of_cultivation',
-            'market_price', 'production', 'fk_language', 'crop_image', 'crop_audio'
+            'market_price', 'production', 'fk_language', 'crop_image', 'crop_audio','crop_name',
         ]
 
     def get_crop_image(self, obj):

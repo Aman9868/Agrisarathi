@@ -561,18 +561,10 @@ class GetAllFarmerbyFPO(APIView):
                     return Response({'error': 'FPO details not found'}, status=status.HTTP_404_NOT_FOUND)
 
                 fpo_farmers = FarmerProfile.objects.filter(fpo_name=fpo_profile,is_deleted=False)
-                farmers_data = []
-                for farmer in fpo_farmers:
-                    farmers_data.append({
-                     'farmer_id': farmer.id,
-                    'farmer_name': farmer.name,
-                    'farmer_mobile': farmer.mobile,
-                    'farmer_district': farmer.district,
-                    'farmer_village':farmer.village,
-                    'farmer_block':farmer.block,
-                    'created_at':farmer.created_at,})
-                total_farmers = fpo_farmers.count()
-                return Response({'status': 'success', 'data': farmers_data, 'total_farmers': total_farmers}, status=status.HTTP_200_OK)
+                paginator=FarmersAllPagination()
+                result_page=paginator.paginate_queryset(fpo_farmers, request)
+                serializer = FarmerProfileSerializer(result_page, many=True)
+                return paginator.get_paginated_response(serializer.data)
             else:
                 return Response({'error': 'Only FPO users can access this endpoint'}, status=status.HTTP_403_FORBIDDEN)
         except Exception as e:
@@ -1129,46 +1121,62 @@ class PurchaseInfo(APIView):
                                  "error_message": error_message,"traceback": trace},status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 ###########################--------------------GE ALL Products FPO/Suppliers----------------##############
 class GetallProductsInfo(APIView):
-    permission_classes=[IsAuthenticated]
-    def get(self,request):
-        user=request.user
-        print(f"User: {user}")
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
         try:
             if user.user_type == 'fpo':
                 try:
                     fpo_profile = FPO.objects.get(user=user)
-                    print(f"Fpo Profile : {fpo_profile}")
                 except FPO.DoesNotExist:
                     return Response({'error': 'Fpo details not found'}, status=status.HTTP_404_NOT_FOUND)
-                products = InventoryDetails.objects.filter(fk_fpo=fpo_profile,is_deleted=False)
-                print(f"Product in inventory: {products}")
-                product_serializer = FPOProductDetailSerializer(products, many=True)
-                print(f"Product Data :{product_serializer.data}")
-                prices = ProductPrices.objects.filter(fk_product__in=[p.fk_product for p in products])
-                prices_serializer = ProductPricesSerializer(prices, many=True)
-                return Response({'status': 'success','product': product_serializer.data,'prices': prices_serializer.data},
-                                 status=status.HTTP_200_OK)
-            elif user.user_type =='supplier':
+
+                products = InventoryDetails.objects.filter(fk_fpo=fpo_profile, is_deleted=False)
+
+                paginator = GetallProductPagination()
+                result_page = paginator.paginate_queryset(products, request)
+                if result_page is not None:
+                    product_serializer = FPOProductDetailSerializer(result_page, many=True)
+                    prices = ProductPrices.objects.filter(fk_product__in=[p.fk_product for p in products])
+                    prices_serializer = ProductPricesSerializer(prices, many=True)
+                    return paginator.get_paginated_response({
+                        'status': 'success',
+                        'products': product_serializer.data,
+                        'prices': prices_serializer.data
+                    })
+
+            elif user.user_type == 'supplier':
                 try:
                     supplier_profile = Supplier.objects.get(user=user)
-                    print(f"Supplier Profile :{supplier_profile}")
                 except Supplier.DoesNotExist:
                     return Response({'error': 'Supplier details not found'}, status=status.HTTP_404_NOT_FOUND)
-                products = InventoryDetails.objects.filter(fk_supplier=supplier_profile,is_deleted=False)
-                print(f"Product in inventory: {products}")
-                product_serializer = SupplierProductDetailSerializer(products, many=True)
-                print(f"Product Data :{product_serializer.data}")
-                prices = ProductPrices.objects.filter(fk_product__in=[p.fk_product for p in products])
-                prices_serializer = ProductPricesSerializer(prices, many=True)
-                return Response({'status': 'success','product': product_serializer.data,'prices': prices_serializer.data},
-                                 status=status.HTTP_200_OK)
-            else:
-                return Response({'message': 'Invalid user type'}, status=403)
+
+                products = InventoryDetails.objects.filter(fk_supplier=supplier_profile, is_deleted=False)
+
+                paginator = GetallProductPagination()
+                result_page = paginator.paginate_queryset(products, request)
+                if result_page is not None:
+                    product_serializer = SupplierProductDetailSerializer(result_page, many=True)
+                    prices = ProductPrices.objects.filter(fk_product__in=[p.fk_product for p in products])
+                    prices_serializer = ProductPricesSerializer(prices, many=True)
+                    return paginator.get_paginated_response({
+                        'status': 'success',
+                        'products': product_serializer.data,
+                        'prices': prices_serializer.data
+                    })
+
+            return Response({'message': 'Invalid user type'}, status=status.HTTP_403_FORBIDDEN)
+
         except Exception as e:
-                error_message = str(e)
-                trace = traceback.format_exc()
-                return Response({"status": "error","message": "An unexpected error occurred",
-                                 "error_message": error_message,"traceback": trace},status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            error_message = str(e)
+            trace = traceback.format_exc()
+            return Response({
+                "status": "error",
+                "message": "An unexpected error occurred",
+                "error_message": error_message,
+                "traceback": trace
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 #################----------------------------Inventory Section FPO/Suppliers------------------------#################
 class InventorySection(APIView):
     permission_classes=[IsAuthenticated]
@@ -1189,10 +1197,15 @@ class InventorySection(APIView):
                 print(f"Product Data: {products}")
                 inventory = InventoryDetails.objects.filter(fk_product__in=[p for p in products],fk_fpo=fpo_profile)
                 print(f"Inventory Data: {inventory}")
-                inventory_serializer=FPOProductDetailSerializer(inventory,many=True)
+                paginator=GetallInventoryPagination()
+                result_page = paginator.paginate_queryset(inventory, request)
+                print(f"Result page: {result_page}")
+                inventory_serializer=FPOProductDetailSerializer(result_page,many=True)
                 print(f"Inventory's: {inventory_serializer.data}")
-                return Response({'status': 'success','inventory': inventory_serializer.data},
-                                 status=status.HTTP_200_OK)
+                return paginator.get_paginated_response({
+                        'status': 'success',
+                        'inventory': inventory_serializer.data,
+                    })
             elif user.user_type =='supplier':
                 try:
                     supplier_profile = Supplier.objects.get(user=user)
@@ -1202,10 +1215,14 @@ class InventorySection(APIView):
                 products = ProductDetails.objects.filter(fk_supplier=supplier_profile,is_deleted=False,fk_productype_id=filter_type)
                 inventory = InventoryDetails.objects.filter(fk_product__in=[p for p in products],fk_supplier=supplier_profile)
                 print(f"Inventory Data: {inventory}")
-                inventory_serializer=SupplierProductDetailSerializer(inventory,many=True)
+                paginator=GetallInventoryPagination()
+                result_page = paginator.paginate_queryset(inventory, request)
+                inventory_serializer=SupplierProductDetailSerializer(result_page,many=True)
                 print(f"Inventory's: {inventory_serializer.data}")
-                return Response({'status': 'success','inventory': inventory_serializer.data},
-                                 status=status.HTTP_200_OK)
+                return paginator.get_paginated_response({
+                        'status': 'success',
+                        'inventory': inventory_serializer.data,
+                    })
             else:
                 return Response({'message': 'Invalid user type'}, status=403)
         except Exception as e:
@@ -1272,132 +1289,138 @@ class InventorySection(APIView):
                                  "error_message": error_message,"traceback": trace},status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 ########################------------------------------------Sales Section FPO/Supplier---------------###################
 class AddGetSales(APIView):
-    permission_classes=[IsAuthenticated]
-    def post(self,request,format=None):
-        user=request.user
+    permission_classes = [IsAuthenticated]
+    def post(self, request, format=None):
+        user = request.user
         print(f"User: {user}")
         try:
+            buyer_name, mobile_no, address, sale_date, products, payment = map(request.data.get, 
+                    ['buyer_name', 'mobile_no', 'address', 'sale_date', 'products', 'payment'])
+            if not sale_date or not payment or not products or not mobile_no:
+                return Response({'error': 'Fields must be required'}, status=400)
+
             if user.user_type == 'fpo':
-                buyer_name, mobile_no, address, sale_date, products, payment = map(request.data.get, 
-                        ['buyer_name', 'mobile_no', 'address', 'sale_date', 'products', 'payment'])
-                if not sale_date or not payment or not products or not mobile_no:
-                    return Response({'error': 'Fileds must be required'}, status=400)
                 try:
                     fpo_profile = FPO.objects.get(user=user)
                     print(f"Fpo Profile : {fpo_profile}")
                 except FPO.DoesNotExist:
                     return Response({'error': 'Fpo details not found'}, status=status.HTTP_404_NOT_FOUND)
 
-                is_farmer = FarmerProfile.objects.filter(mobile_no=mobile_no, fpo_name=fpo_profile).exists()
+                is_farmer = FarmerProfile.objects.filter(mobile=mobile_no, fpo_name=fpo_profile).exists()
                 print(f"Buyer is Farmer or Not: {is_farmer}")
                 discount = request.data.get('discount', 0) if is_farmer else 0
-                customer_data = {'buyer_name': buyer_name, 'mobile_no': mobile_no, 'address': address, 'fk_fpo': fpo_profile}
+                customer_data = {'buyer_name': buyer_name, 'mobile_no': mobile_no, 'address': address, 'fk_fpo': fpo_profile.id}
+                print(f"Customer data: {customer_data}")
                 customer_serializer = FPOCustomerDetailsSerializer(data=customer_data)
-                print(f"Customer Data: {customer_serializer.data}")
-                customer = customer_serializer.save() if customer_serializer.is_valid() else Response(customer_serializer.errors, status=400)
-                with transaction.atomic():
-                    sale_responses, total_price = [], 0
-                    for product_data in products:
-                        quantity, inventory_id = product_data.get('Quantity'), product_data.get('inventory_id')
-                        inventory = InventoryDetails.objects.filter(id=inventory_id, fk_fpo=fpo_profile).first()
-                        print(f"Inventpry Data: {inventory}")
-                        if not inventory or inventory.stock < quantity:
-                            return Response({'error': f'Inventory issue for product id: {inventory_id}'}, status=404 if not inventory else 400)
-                
-                        product = inventory.fk_product
-                        productprice = ProductPrices.objects.filter(fk_product=product).first()
-                        if not productprice:
-                            return Response({'error': f'Pricing issue for product: {product.productName}'}, status=400)
-                
-                        price = productprice.final_price_unit
-                        amount = price * quantity * (1 - discount / 100)
 
-                        inventory.stock -= quantity
-                        inventory.save()
-                        product.quantity -= quantity
-                        product.save()
-                        #Create Sales Record
-                        sale_data = {'fk_invent': inventory.id, 'amount': amount, 'sales_date': sale_date, 
-                             'final_price': price, 'payment_method': payment, 'fk_custom': customer.id}
-                        sale_serializer = ProductSaleSerializer(data=sale_data)
-                        sale = sale_serializer.save() if sale_serializer.is_valid() else Response(sale_serializer.errors, status=400)
+                if customer_serializer.is_valid():
+                    customer = customer_serializer.save()
+                    print(f"Customer Serializer: {customer_serializer.validated_data}")
+                else:
+                    return Response(customer_serializer.errors, status=400)
 
-                        sale_responses.append(sale_serializer.data)
-                        total_price += amount
-
-                        sales_record_data = {'name': buyer_name, 'quantity': quantity, 'total_amount': amount, 'fk_fpo': fpo_profile, 
-                                     'sales_date': sale_date, 'product_name': product.productName, 
-                                     'category': inventory.fk_product.fk_productype.product_type, 
-                                     'fk_fposupplier_id': inventory.fk_fposupplier.id}
-                        sales_record_serializer = FPOSalesRecordItemSerializer(data=sales_record_data)
-                        if not sales_record_serializer.is_valid():
-                            return Response(sales_record_serializer.errors, status=400)
-                        sales_record_serializer.save()
-
-                return Response({"message": "Sales processed successfully", "sales": sale_responses,
-                              "total_price": total_price}, status=201)
-            elif user.user_type=="supplier":
-                buyer_name, mobile_no, address, sale_date, products, payment = map(request.data.get, 
-                        ['buyer_name', 'mobile_no', 'address', 'sale_date', 'products', 'payment'])
-                if not sale_date or not payment or not products or not mobile_no:
-                    return Response({'error': 'Fileds must be required'}, status=400)
+            elif user.user_type == "supplier":
                 try:
                     supplier_profile = Supplier.objects.get(user=user)
-                    print(f"Supplier Profile :{supplier_profile}")
+                    print(f"Supplier Profile: {supplier_profile}")
                 except Supplier.DoesNotExist:
                     return Response({'error': 'Supplier details not found'}, status=status.HTTP_404_NOT_FOUND)
-                customer_data = {'buyer_name': buyer_name, 'mobile_no': mobile_no, 'address': address, 'fk_supplier': supplier_profile}
+                
+                customer_data = {'buyer_name': buyer_name, 'mobile_no': mobile_no, 'address': address, 'fk_supplier_id': supplier_profile.id}
                 customer_serializer = SupplierCustomerDetailsSerializer(data=customer_data)
-                print(f"Customer Data: {customer_serializer.data}")
-                customer = customer_serializer.save() if customer_serializer.is_valid() else Response(customer_serializer.errors, status=400)
-                with transaction.atomic():
-                    sale_responses, total_price = [], 0
-                    for product_data in products:
-                        quantity, inventory_id = product_data.get('Quantity'), product_data.get('inventory_id')
-                        inventory = InventoryDetails.objects.filter(id=inventory_id, fk_fpo=fpo_profile).first()
-                        print(f"Inventpry Data: {inventory}")
-                        if not inventory or inventory.stock < quantity:
-                            return Response({'error': f'Inventory issue for product id: {inventory_id}'}, status=404 if not inventory else 400)
-                
-                        product = inventory.fk_product
-                        productprice = ProductPrices.objects.filter(fk_product=product).first()
-                        if not productprice:
-                            return Response({'error': f'Pricing issue for product: {product.productName}'}, status=400)
-                
-                        price = productprice.final_price_unit
-                        print(f"Price: {price}")
-                        amount = price * quantity
-                        print(f"Total Amount: {amount}")
+                if customer_serializer.is_valid():
+                    customer = customer_serializer.save()
+                    print(f"Customer Data: {customer_serializer.validated_data}")
+                else:
+                    return Response(customer_serializer.errors, status=400)
 
-                        inventory.stock -= quantity
-                        inventory.save()
-                        product.quantity -= quantity
-                        product.save()
-                        #Create Sales Record
-                        sale_data = {'fk_invent': inventory.id, 'amount': amount, 'sales_date': sale_date, 
-                             'final_price': price, 'payment_method': payment, 'fk_custom': customer.id}
-                        sale_serializer = ProductSaleSerializer(data=sale_data)
-                        sale = sale_serializer.save() if sale_serializer.is_valid() else Response(sale_serializer.errors, status=400)
+            else:
+                return Response({'error': 'Invalid user type'}, status=400)
 
+            with transaction.atomic():
+                sale_responses, total_price = [], 0
+                for product_data in products:
+                    quantity, inventory_id = product_data.get('Quantity'), product_data.get('inventory_id')
+                    inventory = InventoryDetails.objects.filter(id=inventory_id).first()
+                    if not inventory or inventory.stock < quantity:
+                        return Response({'error': f'Inventory issue for product id: {inventory_id}'}, status=404 if not inventory else 400)
+            
+                    product = inventory.fk_product
+                    productprice = ProductPrices.objects.filter(fk_product=product).first()
+                    if not productprice:
+                        return Response({'error': f'Pricing issue for product: {product.productName}'}, status=400)
+            
+                    price = productprice.final_price_unit
+                    amount = price * quantity * (1 - discount / 100) if user.user_type == 'fpo' else price * quantity
+                    print(f"Price: {price}, Amount: {amount}")
+
+                    inventory.stock -= quantity
+                    inventory.save()
+                    product.quantity -= quantity
+                    product.save()
+
+                    sale_data = {
+                        'fk_invent': inventory.id, 
+                        'amount': amount, 
+                        'sales_date': sale_date,
+                        'final_price': price, 
+                        'payment_method': payment, 
+                        'fk_custom': customer.id
+                    }
+                    sale_serializer = ProductSaleSerializer(data=sale_data)
+                    if sale_serializer.is_valid():
+                        sale = sale_serializer.save()
                         sale_responses.append(sale_serializer.data)
-                        total_price += amount
+                    else:
+                        return Response(sale_serializer.errors, status=400)
 
-                        sales_record_data = {'name': buyer_name, 'quantity': quantity, 'total_amount': amount, 'fk_supplier': supplier_profile, 
-                                     'sales_date': sale_date, 'product_name': product.productName, 
-                                     'category': inventory.fk_product.fk_productype.product_type, 
-                                     'fk_inputsupplier_id': inventory.fk_inputsupplier.id}
+                    total_price += amount
+
+                    if user.user_type == 'fpo':
+                        sales_record_data = {
+                            'name': buyer_name, 
+                            'quantity': quantity, 
+                            'total_amount': amount, 
+                            'fk_fpo': fpo_profile.id,
+                            'sales_date': sale_date, 
+                            'product_name': product.productName,
+                            'category': inventory.fk_product.fk_productype.product_type,
+                            'fk_fposupplier_id': inventory.fk_fposupplier.id
+                        }
+                        sales_record_serializer = FPOSalesRecordItemSerializer(data=sales_record_data)
+                    else:
+                        sales_record_data = {
+                            'name': buyer_name, 
+                            'quantity': quantity, 
+                            'total_amount': amount, 
+                            'fk_supplier': supplier_profile,
+                            'sales_date': sale_date, 
+                            'product_name': product.productName,
+                            'category': inventory.fk_product.fk_productype.product_type,
+                            'fk_inputsupplier_id': inventory.fk_inputsupplier.id
+                        }
                         sales_record_serializer = SupplierSalesRecordItemSerializer(data=sales_record_data)
-                        if not sales_record_serializer.is_valid():
-                            return Response(sales_record_serializer.errors, status=400)
-                        sales_record_serializer.save()
 
-                return Response({"message": "Sales processed successfully", "sales": sale_responses,
-                              "total_price": total_price}, status=201)
+                    if sales_record_serializer.is_valid():
+                        sales_record_serializer.save()
+                    else:
+                        return Response(sales_record_serializer.errors, status=400)
+
+            return Response({
+                "message": "Sales processed successfully", 
+                "sales": sale_responses,
+                "total_price": total_price
+            }, status=201)
+
         except Exception as e:
-                error_message = str(e)
-                trace = traceback.format_exc()
-                return Response({"status": "error","message": "An unexpected error occurred",
-                                 "error_message": error_message,"traceback": trace},status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            error_message = str(e)
+            trace = traceback.format_exc()
+            return Response({
+                "status": "error",
+                "message": "An unexpected error occurred",
+                "error_message": error_message,
+                "traceback": trace
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
     
     def get(self, request,format=None):
         user=request.user
