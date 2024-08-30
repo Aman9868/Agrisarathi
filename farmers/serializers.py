@@ -182,7 +182,7 @@ class CurrentNewsPagination(LimitOffsetPagination):
 ########-----------------------------------------CROP SUGGESTion-----------------------#################
 class SuggestedCropSerializer(serializers.ModelSerializer):
     crop_image = serializers.SerializerMethodField()
-    crop_name=serializers.CharField(source='fk_crop.name', default=None)
+    crop_name=serializers.CharField(source='fk_crop.crop_name', default=None)
     crop_audio = serializers.SerializerMethodField()
 
     class Meta:
