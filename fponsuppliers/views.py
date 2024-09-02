@@ -64,8 +64,17 @@ class UserLogin(APIView):
                 return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
         except Exception as e:
-            print(f"Error occurred: {str(e)}")
-            return Response({'error': 'An error occurred'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+                error_message = str(e)
+                trace = traceback.format_exc()
+                return Response(
+                {
+                    "status": "error",
+                    "message": "An unexpected error occurred",
+                    "error_message": error_message,
+                    "traceback": trace
+                },
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
     def update_user_info(self, user, user_type, ip_address, is_new=False):
         if user_type == 'fpo':
@@ -379,9 +388,13 @@ class FarmerByFPO(APIView):
             farmer_id = data.get('farmer_id')
             if not farmer_id :
                 return Response({'status': 'error', 'msg': 'Missing required fields'}, status=status.HTTP_400_BAD_REQUEST)
-            if user.user_type=="farmer":
+            if user.user_type=="fpo":
                 try:
-                    farmer = FarmerProfile.objects.get(user=user,fpo_name_id=farmer_id)
+                    fpo = FPO.objects.get(user=user)
+                except FPO.DoesNotExist:
+                    return Response({'status': 'error', 'msg': 'Fpo does not exist'}, status=status.HTTP_404_NOT_FOUND)
+                try:
+                    farmer=FarmerProfile.objects.get(id=farmer_id,fpo_name=fpo)
                 except FarmerProfile.DoesNotExist:
                     return Response({'status': 'error', 'msg': 'Farmer does not exist'}, status=status.HTTP_404_NOT_FOUND)
                 if 'farmer_name' in data:
@@ -513,6 +526,7 @@ class GetSingleFarmerDetailsbyFPO(APIView):
     permission_classes = [IsAuthenticated]
     def get(self, request,format=None):
             user = request.user
+            farmer_id=request.query_params.get("farmer_id")
             print(f"User is {user.user_type}")
             try:
                 if user.user_type == 'fpo':
@@ -521,7 +535,7 @@ class GetSingleFarmerDetailsbyFPO(APIView):
                     except FPO.DoesNotExist:
                         return Response({'error': 'FPO details not found'}, status=status.HTTP_404_NOT_FOUND)
 
-                fpo_farmers = FarmerProfile.objects.filter(fpo_name_id=fpo_profile,id=fpo_profile.id)
+                fpo_farmers = FarmerProfile.objects.filter(fpo_name_id=fpo_profile,id=farmer_id)
                 farmers_data = []
                 for farmer in fpo_farmers:
                     farmers_data.append({
@@ -920,7 +934,57 @@ class ProductDetailsAddGetDelUpdate(APIView):
                 },
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
-        
+#####################--------------------GET Product DetaILS bY FPO/Supplier-------------#####
+class GetProductDetailsByFPOSupplier(APIView):
+    permission_classes = [IsAuthenticated]
+    def get(self, request, format=None):
+        user = request.user
+        print(f"User is {user.user_type}")
+        try:
+            productype_id=request.query_params.get('producttype')
+            if not productype_id:
+                return Response({'error': 'Product Type ID is required'}, status=status.HTTP_400_BAD_REQUEST)
+            if user.user_type == 'fpo':
+                try:
+                    fpo_profile=FPO.objects.get(user=user)
+                except FPO.DoesNotExist:
+                    return Response({'error': 'FPO details not found'}, status=status.HTTP_404_NOT_FOUND)
+                products = ProductDetails.objects.filter(fk_productype_id=productype_id,fk_fpo=fpo_profile,is_deleted=False)
+                print(f"Product ARE :{products}")
+                paginator=GetallProductPagination()
+                result_page = paginator.paginate_queryset(products, request)
+                serializer=FPOProductDetailsSerializer(result_page, many=True, context={'fpo_id': fpo_profile.id})
+                print(f"Products Data : {serializer.data}")
+                return paginator.get_paginated_response({
+                        'status': 'success',
+                        'data': serializer.data,
+                    })
+            elif user.user_type =='supplier':
+                try:
+                    supplier_profile=Supplier.objects.get(user=user)
+                except Supplier.DoesNotExist:
+                    return Response({'error': 'FPO details not found'}, status=status.HTTP_404_NOT_FOUND)
+                products = ProductDetails.objects.filter(fk_productype__product_type_id=productype_id,fk_fpo=fpo_profile)
+                print(f"Product ARE :{products}")
+                paginator=GetallProductPagination()
+                result_page = paginator.paginate_queryset(products, request)
+                serializer = SupplierProductDetailsSerializer(result_page, many=True, context={'supplier_id': supplier_profile.id})
+                return Response(serializer.data, status=status.HTTP_200_OK)
+            else:
+                return Response({'error': 'Invalid User Type'}, status=status.HTTP_403_FORBIDDEN)
+
+        except Exception as e:
+                error_message = str(e)
+                trace = traceback.format_exc()
+                return Response(
+                {
+                    "status": "error",
+                    "message": "An unexpected error occurred",
+                    "error_message": error_message,
+                    "traceback": trace
+                },
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 #####################-----------------------ADD PRODUCT CSV------------------------------##############
 class ADDProductDetailsCSV(APIView):
     permission_classes = [IsAuthenticated]
