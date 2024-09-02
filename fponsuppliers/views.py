@@ -1008,7 +1008,7 @@ class ADDProductDetailsCSV(APIView):
             df = pd.read_excel(file)
 
             for _, row in df.iterrows():
-                productname = row.get('productName')
+                productname = row.get('ProductName')
                 if not productname:
                     continue  # Skip rows with missing essential data
 
@@ -1021,20 +1021,20 @@ class ADDProductDetailsCSV(APIView):
 
                     product_data = {
                         'productName': productname,
-                        'productDescription': row.get('productDescription', ' '),
+                        'productDescription': row.get('ProductDescription', ' '),
                         'composition': row.get('composition', ' '),
-                        'measurement_type': row.get('measurement_type'),
-                        'measurement_unit': row.get('measurement_unit'),
-                        'selling_status': row.get('selling_status'),
+                        'measurement_type': row.get('Measurement'),
+                        'measurement_unit': row.get('MeasurementIn'),
+                        'selling_status': row.get('Selling Status'),
                         'Category': row.get('Category'),
-                        'quantity': row.get('quantity'),
+                        'quantity': row.get('Quantity'),
                         'fk_productype_id': producttype,
                         'fk_fpo': fpo_profile,
-                        'expiry_date': row.get('expiry_date')
+                        'expiry_date': row.get('Expiry Date')
                     }
 
                     if producttype in ["1", "3"]:
-                        product_data['manufacturerName'] = row.get('manufacturerName', ' ')
+                        product_data['manufacturerName'] = row.get('Manufacturer', ' ')
                     elif producttype == "2":
                         product_data['fk_crops_id'] = row.get('crop_id')
                         product_data['fk_variety_id'] = row.get('variety')
@@ -1043,13 +1043,13 @@ class ADDProductDetailsCSV(APIView):
                     supplier = FPOSuppliers.objects.create(
                         fk_fpo=fpo_profile,
                         fk_productype_id=producttype,
-                        quantity=row.get('quantity'),
-                        total_amount=row.get('purchase_price'),
-                        party_name=row.get('party_name'),
-                        party_mobileno=row.get('mobileno'),
+                        quantity=row.get('Quantity'),
+                        total_amount=row.get('Purchase Price'),
+                        party_name=row.get('Party Name'),
+                        party_mobileno=row.get('Mobile No'),
                         party_company=row.get('company_name'),
-                        unit_price=row.get('unit_price'),
-                        party_gst=row.get('party_gst', ' ')
+                        unit_price=row.get('Unit Price'),
+                        party_gst=row.get('Party GST', ' ')
                     )
                     print(f"FPO Supplier Object:{supplier}")
 
@@ -1061,9 +1061,9 @@ class ADDProductDetailsCSV(APIView):
                     # FPO Prices
                     ProductPrices.objects.create(
                         fk_product=product,
-                        purchase_price=row.get('purchase_price'),
-                        unit_price=row.get('unit_price'),
-                        final_price_unit=row.get('final_price'),
+                        purchase_price=row.get('Purchase Price'),
+                        unit_price=row.get('Unit Price'),
+                        final_price_unit=row.get('Selling Price'),
                         fk_fpo=fpo_profile,
                         fk_fposupplier=supplier
                     )
@@ -1071,7 +1071,7 @@ class ADDProductDetailsCSV(APIView):
                     InventoryDetails.objects.create(
                         fk_product=product,
                         fk_fpo=fpo_profile,
-                        stock=row.get('quantity', 0),
+                        stock=row.get('Quantity', 0),
                         fk_fposupplier=supplier
                     )
 
@@ -1084,16 +1084,16 @@ class ADDProductDetailsCSV(APIView):
 
                     product_data = {
                         'productName': productname,
-                        'productDescription': row.get('productDescription', ' '),
+                        'productDescription': row.get('ProductDescription', ' '),
                         'composition': row.get('composition', ' '),
-                        'measurement_type': row.get('measurement_type'),
-                        'measurement_unit': row.get('measurement_unit'),
-                        'selling_status': row.get('selling_status'),
+                        'measurement_type': row.get('Measurement'),
+                        'measurement_unit': row.get('MeasurementIn'),
+                        'selling_status': row.get('Selling Status'),
                         'Category': row.get('Category'),
-                        'quantity': row.get('quantity'),
+                        'quantity': row.get('Quantity'),
                         'fk_productype_id': producttype,
-                        'expiry_date': row.get('expiry_date', ' '),
-                        'manufacturerName': row.get('manufacturerName', ' '),
+                        'expiry_date': row.get('Expiry Date', ' '),
+                        'manufacturerName': row.get('Manufacturer', ' '),
                     }
 
                     product = ProductDetails.objects.create(**product_data)
@@ -1103,13 +1103,13 @@ class ADDProductDetailsCSV(APIView):
                     supplier = InputSuppliers.objects.create(
                         fk_supplier=supplier_info,
                         fk_productype_id=producttype,
-                        quantity=row.get('quantity'),
-                        total_amount=row.get('purchase_price'),
-                        party_name=row.get('party_name'),
-                        party_mobileno=row.get('mobileno'),
+                        quantity=row.get('Quantity'),
+                        total_amount=row.get('Purchase Price'),
+                        party_name=row.get('Party Name'),
+                        party_mobileno=row.get('Mobile No'),
                         party_company=row.get('company_name'),
-                        unit_price=row.get('unit_price'),
-                        party_gst=row.get('party_gst')
+                        unit_price=row.get('Unit Price'),
+                        party_gst=row.get('Party GST', ' ')
                     )
                     print(f"Supplier Inputs Supplier Info :{supplier}")
 
@@ -1119,16 +1119,16 @@ class ADDProductDetailsCSV(APIView):
                     ProductPrices.objects.create(
                         fk_product=product,
                         fk_supplier=supplier_info,
-                        purchase_price=row.get('purchase_price'),
-                        unit_price=row.get('unit_price'),
+                        purchase_price=row.get('Purchase Price'),
+                        unit_price=row.get('Unit Price'),
+                        final_price_unit=row.get('Selling Price'),
                         discount=row.get('discount', 0),
-                        final_price_unit=row.get('final_price'),
                         fk_inputsupplier=supplier
                     )
 
                     InventoryDetails.objects.create(
                         fk_product=product,
-                        stock=row.get('quantity', 0),
+                        stock=row.get('Quantity', 0),
                         fk_inputsupplier=supplier,
                         fk_supplier=supplier_info
                     )
