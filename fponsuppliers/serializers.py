@@ -2,7 +2,7 @@
 from rest_framework import serializers
 from rest_framework_simplejwt.tokens import RefreshToken,TokenError
 from .models import *
-from farmers.models import FarmerProfile 
+from farmers.models import FarmerProfile ,CropMaster
 from .managers import *
 from rest_framework.pagination import LimitOffsetPagination
 from rest_framework.pagination import PageNumberPagination
@@ -172,7 +172,35 @@ class FPOProductDetailsSerializer(serializers.ModelSerializer):
             }
             for price in prices
         ]
-    
+#######################-
+class FPOProductDetailFilterSerializer(serializers.ModelSerializer):
+    fpo_id = serializers.IntegerField(source='fk_fpo.id', read_only=True)
+    crop_name = serializers.CharField(source='fk_crops.crop_name', read_only=True)
+    variety = serializers.CharField(source='fk_variety.variety', read_only=True)
+    prices = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ProductDetails
+        fields = [
+            'id', 'productName', 'productDescription', 'fk_productype_id', 
+            'manufacturerName', 'measurement_type', 'measurement_unit', 
+            'quantity', 'expiry_date', 'composition', 'selling_status', 
+            'Category', 'fpo_id', 'crop_name', 'variety', 'prices'
+        ]
+
+    def get_prices(self, obj):
+        fpo_id = self.context['fpo_id']
+        prices = obj.productprices_set.filter(fk_fpo_id=fpo_id)  
+        return [
+            {
+                "price_id": price.id,
+                "purchase_price": price.purchase_price,
+                "unit_price": price.unit_price,
+                "discount": price.discount,
+                "final_price_unit": price.final_price_unit
+            }
+            for price in prices
+        ]
 #############################-------------------------------------SingleProduct Serializer Supplier------------------------#####
 class SupplierProductDetailsSerializer(serializers.ModelSerializer):
     product_info = serializers.SerializerMethodField()
@@ -197,6 +225,35 @@ class SupplierProductDetailsSerializer(serializers.ModelSerializer):
         }
 
     def get_prices_info(self, obj):
+        supplier_id = self.context['supplier_id']
+        prices = obj.productprices_set.filter(fk_supplier_id=supplier_id)  
+        return [
+            {
+                "price_id": price.id,
+                "purchase_price": price.purchase_price,
+                "unit_price": price.unit_price,
+                "discount": price.discount,
+                "final_price_unit": price.final_price_unit
+            }
+            for price in prices
+        ]
+#######-----
+class SupplierProductFilterDetailsSerializer(serializers.ModelSerializer):
+    supplier_id = serializers.IntegerField(source='fk_supplier.id', read_only=True)
+    prices = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ProductDetails
+        fields = [
+            'id', 'productName', 'productDescription', 'fk_productype_id', 
+            'manufacturerName', 'measurement_type', 'measurement_unit', 
+            'quantity', 'composition', 'selling_status', 'Category', 
+            'supplier_id', 'prices'
+        ]
+class CropMasterSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CropMaster
+    def get_prices(self, obj):
         supplier_id = self.context['supplier_id']
         prices = obj.productprices_set.filter(fk_supplier_id=supplier_id)  
         return [
@@ -365,3 +422,8 @@ class GetallSalesPagination(PageNumberPagination):
     page_size = 10  
     page_size_query_param = 'page_size'
     max_page_size = 100 
+
+class CropMasterSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CropMaster
+        fields='__all__'

@@ -907,8 +907,8 @@ class ProductDetailsAddGetDelUpdate(APIView):
                 if product_id:
                     products = products.filter(id=product_id)
 
-                serializer = FPOProductDetailsSerializer(products, many=True, context={'fpo_id': fpo_profile.id})
-                return Response(serializer.data, status=status.HTTP_200_OK)
+                serializer = FPOProductDetailFilterSerializer(products, many=True, context={'fpo_id': fpo_profile.id})
+                return Response({'data':serializer.data}, status=status.HTTP_200_OK)
             elif user.user_type =='supplier':
                 try:
                     supplier_profile = Supplier.objects.get(user=user)
@@ -919,7 +919,7 @@ class ProductDetailsAddGetDelUpdate(APIView):
                 if product_id:
                     products = products.filter(id=product_id)
 
-                serializer = SupplierProductDetailsSerializer(products, many=True, context={'supplier_id': supplier_profile.id})
+                serializer = SupplierProductFilterDetailsSerializer(products, many=True, context={'supplier_id': supplier_profile.id})
                 return Response(serializer.data, status=status.HTTP_200_OK)
                           
         except Exception as e:
@@ -953,7 +953,7 @@ class GetProductDetailsByFPOSupplier(APIView):
                 print(f"Product ARE :{products}")
                 paginator=GetallProductPagination()
                 result_page = paginator.paginate_queryset(products, request)
-                serializer=FPOProductDetailsSerializer(result_page, many=True, context={'fpo_id': fpo_profile.id})
+                serializer=FPOProductDetailFilterSerializer(result_page, many=True, context={'fpo_id': fpo_profile.id})
                 print(f"Products Data : {serializer.data}")
                 return paginator.get_paginated_response({
                         'status': 'success',
@@ -968,7 +968,7 @@ class GetProductDetailsByFPOSupplier(APIView):
                 print(f"Product ARE :{products}")
                 paginator=GetallProductPagination()
                 result_page = paginator.paginate_queryset(products, request)
-                serializer = SupplierProductDetailsSerializer(result_page, many=True, context={'supplier_id': supplier_profile.id})
+                serializer = SupplierProductFilterDetailsSerializer(result_page, many=True, context={'supplier_id': supplier_profile.id})
                 return Response(serializer.data, status=status.HTTP_200_OK)
             else:
                 return Response({'error': 'Invalid User Type'}, status=status.HTTP_403_FORBIDDEN)
@@ -1760,3 +1760,50 @@ class CheckBuyerisFarmerorNot(APIView):
                 trace = traceback.format_exc()
                 return Response({"status": "error","message": "An unexpected error occurred",
                                  "error_message": error_message,"traceback": trace},status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+###############-------------------------------Get ALL CROPS----------------############
+class GetallCrops(APIView):
+    permission_classes=[IsAuthenticated]
+    def get(self,request):
+        user=request.user
+        print(f"User is {user.user_type}")
+        try:
+            user_language=request.query_params.get('user_language','1')
+            if user.user_type=="fpo":
+
+                try:
+                    data=CropMaster.objects.filter(fk_language_id=user_language)
+                except CropMaster.DoesNotExist:
+                    return Response({'status': 'error', 'msg': 'No such Data Found'}, status=status.HTTP_404_NOT_FOUND)
+                states_serializer=CropMasterSerializer(data,many=True)
+                print(f"States Data: {states_serializer.data}")
+                return Response({'success': 'ok','data': states_serializer.data}, status=status.HTTP_200_OK)
+            else:
+                return Response({'error': 'User type is not farmer'}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            error_message = str(e)
+            trace = traceback.format_exc()
+            return Response(
+                {
+                    "status": "error",
+                    "message": "An unexpected error occurred",
+                    "error_message": error_message,
+                    "traceback": trace
+                },
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+#############################################---------------------------Get Crop Variety Details----------------################
+class GetCropVariety(APIView):
+    permission_classes=[IsAuthenticated]
+    def get(self, request):
+        user=request.user
+        print(f"User is '{user.user_type}")
+        try:
+            if user.user_type=="fpo":
+                crop_id=request.query_params.get('crop_id')
+                user_language=request.query_params.get('user_language','1')
+                variety=CropVariety.objects.filter(fk_crops_id=crop_id,fk_language_id=user_language)
+                return Response({'message':'success','data':list(variety.values())}, status=200)
+            else:
+                return Response({'message':'Only Farmer can access this data'}, status=403)
+        except Exception as e:
+            return Response({'error': 'An error occurred.', 'details': str(e), 'traceback': traceback.format_exc()}, status=500)

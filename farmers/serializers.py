@@ -221,7 +221,9 @@ class CerealsPrefrencesSerializer(serializers.ModelSerializer):
     class Meta:
         model = CerealPreferenceCompletion
         fields = '__all__'
-
+class CropMasterSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CropMaster
 #####################################-----------------------------SOIL Testing----------------####################
 class ShopDetailSerializer(serializers.ModelSerializer):
     class Meta:

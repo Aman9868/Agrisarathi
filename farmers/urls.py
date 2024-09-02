@@ -38,6 +38,7 @@ urlpatterns = [
 
     ##################----------------------Get Inital Screen Crops------------------################
     path('GetInitialScreenCrops',GetInitialScreenCrops.as_view(), name='GetInitialScreenCrops'),
+    path('GetallCrops',GetallCrops.as_view(), name='GetallCrops'),
     #################--------------------Service Providers----------------------##############
     path('ServiceProviderList',ServiceProviderList.as_view(),name='ServiceProviderList'),
 
