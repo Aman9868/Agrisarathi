@@ -216,7 +216,7 @@ def AddCropVariety(request):
 @csrf_exempt
 def GetCrops(request):
     try:
-        if request.method=="POST":
+        if request.method=="":
             data = json.loads(request.body.decode('utf-8'))
             user_language=data.get('user_language')
             crops=CropMaster.objects.filter(fk_language_id=user_language)
@@ -225,6 +225,7 @@ def GetCrops(request):
             return JsonResponse({'message': 'Method not allowed'}, status=405)
     except Exception as e:
         return JsonResponse({'error': 'An error occurred.', 'details': str(e), 'traceback': traceback.format_exc()}, status=500)
+
 
 
 ##############--------------------------------------------Crop Suggested-------------------------##############

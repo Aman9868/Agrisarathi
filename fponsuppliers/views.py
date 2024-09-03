@@ -907,8 +907,8 @@ class ProductDetailsAddGetDelUpdate(APIView):
                 if product_id:
                     products = products.filter(id=product_id)
 
-                serializer = FPOProductDetailsSerializer(products, many=True, context={'fpo_id': fpo_profile.id})
-                return Response(serializer.data, status=status.HTTP_200_OK)
+                serializer = FPOProductDetailFilterSerializer(products, many=True, context={'fpo_id': fpo_profile.id})
+                return Response({'data':serializer.data}, status=status.HTTP_200_OK)
             elif user.user_type =='supplier':
                 try:
                     supplier_profile = Supplier.objects.get(user=user)
@@ -919,7 +919,7 @@ class ProductDetailsAddGetDelUpdate(APIView):
                 if product_id:
                     products = products.filter(id=product_id)
 
-                serializer = SupplierProductDetailsSerializer(products, many=True, context={'supplier_id': supplier_profile.id})
+                serializer = SupplierProductFilterDetailsSerializer(products, many=True, context={'supplier_id': supplier_profile.id})
                 return Response(serializer.data, status=status.HTTP_200_OK)
                           
         except Exception as e:
@@ -953,7 +953,7 @@ class GetProductDetailsByFPOSupplier(APIView):
                 print(f"Product ARE :{products}")
                 paginator=GetallProductPagination()
                 result_page = paginator.paginate_queryset(products, request)
-                serializer=FPOProductDetailsSerializer(result_page, many=True, context={'fpo_id': fpo_profile.id})
+                serializer=FPOProductDetailFilterSerializer(result_page, many=True, context={'fpo_id': fpo_profile.id})
                 print(f"Products Data : {serializer.data}")
                 return paginator.get_paginated_response({
                         'status': 'success',
@@ -968,7 +968,7 @@ class GetProductDetailsByFPOSupplier(APIView):
                 print(f"Product ARE :{products}")
                 paginator=GetallProductPagination()
                 result_page = paginator.paginate_queryset(products, request)
-                serializer = SupplierProductDetailsSerializer(result_page, many=True, context={'supplier_id': supplier_profile.id})
+                serializer = SupplierProductFilterDetailsSerializer(result_page, many=True, context={'supplier_id': supplier_profile.id})
                 return Response(serializer.data, status=status.HTTP_200_OK)
             else:
                 return Response({'error': 'Invalid User Type'}, status=status.HTTP_403_FORBIDDEN)
@@ -1008,7 +1008,7 @@ class ADDProductDetailsCSV(APIView):
             df = pd.read_excel(file)
 
             for _, row in df.iterrows():
-                productname = row.get('productName')
+                productname = row.get('ProductName')
                 if not productname:
                     continue  # Skip rows with missing essential data
 
@@ -1021,20 +1021,20 @@ class ADDProductDetailsCSV(APIView):
 
                     product_data = {
                         'productName': productname,
-                        'productDescription': row.get('productDescription', ' '),
+                        'productDescription': row.get('ProductDescription', ' '),
                         'composition': row.get('composition', ' '),
-                        'measurement_type': row.get('measurement_type'),
-                        'measurement_unit': row.get('measurement_unit'),
-                        'selling_status': row.get('selling_status'),
+                        'measurement_type': row.get('Measurement'),
+                        'measurement_unit': row.get('MeasurementIn'),
+                        'selling_status': row.get('Selling Status'),
                         'Category': row.get('Category'),
-                        'quantity': row.get('quantity'),
+                        'quantity': row.get('Quantity'),
                         'fk_productype_id': producttype,
                         'fk_fpo': fpo_profile,
-                        'expiry_date': row.get('expiry_date')
+                        'expiry_date': row.get('Expiry Date')
                     }
 
                     if producttype in ["1", "3"]:
-                        product_data['manufacturerName'] = row.get('manufacturerName', ' ')
+                        product_data['manufacturerName'] = row.get('Manufacturer', ' ')
                     elif producttype == "2":
                         product_data['fk_crops_id'] = row.get('crop_id')
                         product_data['fk_variety_id'] = row.get('variety')
@@ -1043,13 +1043,13 @@ class ADDProductDetailsCSV(APIView):
                     supplier = FPOSuppliers.objects.create(
                         fk_fpo=fpo_profile,
                         fk_productype_id=producttype,
-                        quantity=row.get('quantity'),
-                        total_amount=row.get('purchase_price'),
-                        party_name=row.get('party_name'),
-                        party_mobileno=row.get('mobileno'),
+                        quantity=row.get('Quantity'),
+                        total_amount=row.get('Purchase Price'),
+                        party_name=row.get('Party Name'),
+                        party_mobileno=row.get('Mobile No'),
                         party_company=row.get('company_name'),
-                        unit_price=row.get('unit_price'),
-                        party_gst=row.get('party_gst', ' ')
+                        unit_price=row.get('Unit Price'),
+                        party_gst=row.get('Party GST', ' ')
                     )
                     print(f"FPO Supplier Object:{supplier}")
 
@@ -1061,9 +1061,9 @@ class ADDProductDetailsCSV(APIView):
                     # FPO Prices
                     ProductPrices.objects.create(
                         fk_product=product,
-                        purchase_price=row.get('purchase_price'),
-                        unit_price=row.get('unit_price'),
-                        final_price_unit=row.get('final_price'),
+                        purchase_price=row.get('Purchase Price'),
+                        unit_price=row.get('Unit Price'),
+                        final_price_unit=row.get('Selling Price'),
                         fk_fpo=fpo_profile,
                         fk_fposupplier=supplier
                     )
@@ -1071,7 +1071,7 @@ class ADDProductDetailsCSV(APIView):
                     InventoryDetails.objects.create(
                         fk_product=product,
                         fk_fpo=fpo_profile,
-                        stock=row.get('quantity', 0),
+                        stock=row.get('Quantity', 0),
                         fk_fposupplier=supplier
                     )
 
@@ -1084,16 +1084,16 @@ class ADDProductDetailsCSV(APIView):
 
                     product_data = {
                         'productName': productname,
-                        'productDescription': row.get('productDescription', ' '),
+                        'productDescription': row.get('ProductDescription', ' '),
                         'composition': row.get('composition', ' '),
-                        'measurement_type': row.get('measurement_type'),
-                        'measurement_unit': row.get('measurement_unit'),
-                        'selling_status': row.get('selling_status'),
+                        'measurement_type': row.get('Measurement'),
+                        'measurement_unit': row.get('MeasurementIn'),
+                        'selling_status': row.get('Selling Status'),
                         'Category': row.get('Category'),
-                        'quantity': row.get('quantity'),
+                        'quantity': row.get('Quantity'),
                         'fk_productype_id': producttype,
-                        'expiry_date': row.get('expiry_date', ' '),
-                        'manufacturerName': row.get('manufacturerName', ' '),
+                        'expiry_date': row.get('Expiry Date', ' '),
+                        'manufacturerName': row.get('Manufacturer', ' '),
                     }
 
                     product = ProductDetails.objects.create(**product_data)
@@ -1103,13 +1103,13 @@ class ADDProductDetailsCSV(APIView):
                     supplier = InputSuppliers.objects.create(
                         fk_supplier=supplier_info,
                         fk_productype_id=producttype,
-                        quantity=row.get('quantity'),
-                        total_amount=row.get('purchase_price'),
-                        party_name=row.get('party_name'),
-                        party_mobileno=row.get('mobileno'),
+                        quantity=row.get('Quantity'),
+                        total_amount=row.get('Purchase Price'),
+                        party_name=row.get('Party Name'),
+                        party_mobileno=row.get('Mobile No'),
                         party_company=row.get('company_name'),
-                        unit_price=row.get('unit_price'),
-                        party_gst=row.get('party_gst')
+                        unit_price=row.get('Unit Price'),
+                        party_gst=row.get('Party GST', ' ')
                     )
                     print(f"Supplier Inputs Supplier Info :{supplier}")
 
@@ -1119,16 +1119,16 @@ class ADDProductDetailsCSV(APIView):
                     ProductPrices.objects.create(
                         fk_product=product,
                         fk_supplier=supplier_info,
-                        purchase_price=row.get('purchase_price'),
-                        unit_price=row.get('unit_price'),
+                        purchase_price=row.get('Purchase Price'),
+                        unit_price=row.get('Unit Price'),
+                        final_price_unit=row.get('Selling Price'),
                         discount=row.get('discount', 0),
-                        final_price_unit=row.get('final_price'),
                         fk_inputsupplier=supplier
                     )
 
                     InventoryDetails.objects.create(
                         fk_product=product,
-                        stock=row.get('quantity', 0),
+                        stock=row.get('Quantity', 0),
                         fk_inputsupplier=supplier,
                         fk_supplier=supplier_info
                     )
@@ -1760,3 +1760,50 @@ class CheckBuyerisFarmerorNot(APIView):
                 trace = traceback.format_exc()
                 return Response({"status": "error","message": "An unexpected error occurred",
                                  "error_message": error_message,"traceback": trace},status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+###############-------------------------------Get ALL CROPS----------------############
+class GetallCrops(APIView):
+    permission_classes=[IsAuthenticated]
+    def get(self,request):
+        user=request.user
+        print(f"User is {user.user_type}")
+        try:
+            user_language=request.query_params.get('user_language','1')
+            if user.user_type=="fpo":
+
+                try:
+                    data=CropMaster.objects.filter(fk_language_id=user_language)
+                except CropMaster.DoesNotExist:
+                    return Response({'status': 'error', 'msg': 'No such Data Found'}, status=status.HTTP_404_NOT_FOUND)
+                states_serializer=CropMasterSerializer(data,many=True)
+                print(f"States Data: {states_serializer.data}")
+                return Response({'success': 'ok','data': states_serializer.data}, status=status.HTTP_200_OK)
+            else:
+                return Response({'error': 'User type is not farmer'}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            error_message = str(e)
+            trace = traceback.format_exc()
+            return Response(
+                {
+                    "status": "error",
+                    "message": "An unexpected error occurred",
+                    "error_message": error_message,
+                    "traceback": trace
+                },
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+#############################################---------------------------Get Crop Variety Details----------------################
+class GetCropVariety(APIView):
+    permission_classes=[IsAuthenticated]
+    def get(self, request):
+        user=request.user
+        print(f"User is '{user.user_type}")
+        try:
+            if user.user_type=="fpo":
+                crop_id=request.query_params.get('crop_id')
+                user_language=request.query_params.get('user_language','1')
+                variety=CropVariety.objects.filter(fk_crops_id=crop_id,fk_language_id=user_language)
+                return Response({'message':'success','data':list(variety.values())}, status=200)
+            else:
+                return Response({'message':'Only Farmer can access this data'}, status=403)
+        except Exception as e:
+            return Response({'error': 'An error occurred.', 'details': str(e), 'traceback': traceback.format_exc()}, status=500)

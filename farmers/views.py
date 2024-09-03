@@ -356,6 +356,37 @@ class GetallStates(APIView):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
+###############-------------------------------Get ALL CROPS----------------############
+class GetallCrops(APIView):
+    permission_classes=[IsAuthenticated]
+    def get(self,request):
+        user=request.user
+        print(f"User is {user.user_type}")
+        try:
+            user_language=request.query_params.get('user_language')
+            if user.user_type=="farmer":
+
+                try:
+                    data=CropMaster.objects.filter(fk_language_id=user_language)
+                except CropMaster.DoesNotExist:
+                    return Response({'status': 'error', 'msg': 'No such Data Found'}, status=status.HTTP_404_NOT_FOUND)
+                states_serializer=CropMasterSerializer(data,many=True)
+                print(f"States Data: {states_serializer.data}")
+                return Response({'success': 'ok','data': states_serializer.data}, status=status.HTTP_200_OK)
+            else:
+                return Response({'error': 'User type is not farmer'}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            error_message = str(e)
+            trace = traceback.format_exc()
+            return Response(
+                {
+                    "status": "error",
+                    "message": "An unexpected error occurred",
+                    "error_message": error_message,
+                    "traceback": trace
+                },
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 #############################################---------------------------Get Crop Variety Details----------------################
 class GetCropVariety(APIView):
     permission_classes=[IsAuthenticated]
