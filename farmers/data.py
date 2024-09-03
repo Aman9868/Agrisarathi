@@ -198,12 +198,12 @@ def AddCropVariety(request):
             crop_id=data.get('crop_id')
             user_language=data.get('user_language')
             excel_file = r'/home/Agrisarathi/agrisarthi/staticfiles/PotaoVariety.xlsx'
-            data_xl = pd.read_excel(excel_file,sheet_name='hin')
+            data_xl = pd.read_excel(excel_file,sheet_name='eng')
             for index, row in data_xl.iterrows():
                 CropVariety.objects.create(
                     fk_crops_id=crop_id,
-                    fk_language_id=user_language,
-                    variety=row['Cropvariety']
+                    eng_name=row['eng_name'],
+                    hin_name=row['hin_name']
                 )
             return JsonResponse({'success':'Data Uploaded Successfully'})
         else:

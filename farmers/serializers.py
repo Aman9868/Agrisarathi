@@ -43,7 +43,7 @@ class FarmerLandAddressSerializer(serializers.ModelSerializer):
     state = serializers.CharField(source='fk_state.state', read_only=True)
     crop_id = serializers.IntegerField(source='fk_crops.id', read_only=True)
     district = serializers.CharField(source='fk_district.district', read_only=True)
-    crop = serializers.CharField(source='fk_crops.crop_name', read_only=True)
+    crop = serializers.SerializerMethodField()
     crop_images=serializers.SerializerMethodField()
     class Meta:
         model = FarmerLandAddress
@@ -51,6 +51,18 @@ class FarmerLandAddressSerializer(serializers.ModelSerializer):
     def get_crop_images(self, obj):
         crop_images = CropImages.objects.filter(fk_cropmaster=obj.fk_crops)
         return [image.crop_image.url for image in crop_images]
+    
+    def get_crop(self, obj):
+        farmer_language = obj.fk_farmer.fk_language.id
+        print(f"Farmer language ID: {farmer_language}")
+        crop_name = None
+        if farmer_language == 1:  
+            crop_name = obj.fk_crops.eng_crop.crop_name if obj.fk_crops.eng_crop else None
+        elif farmer_language == 2: 
+            crop_name = obj.fk_crops.hin_crop.crop_name if obj.fk_crops.hin_crop else None
+        
+        print(f"Returning crop name: {crop_name}")
+        return crop_name
 ########################----------------------------Crop Type Serializers------------------###########
 class POPCropTypeSerializer(serializers.ModelSerializer):
     pop_id = serializers.SerializerMethodField()
@@ -258,6 +270,7 @@ class CerealsPrefrencesSerializer(serializers.ModelSerializer):
 class CropMasterSerializer(serializers.ModelSerializer):
     class Meta:
         model = CropMaster
+        fields = '__all__'
 #####################################-----------------------------SOIL Testing----------------####################
 class ShopDetailSerializer(serializers.ModelSerializer):
     class Meta:

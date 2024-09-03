@@ -86,11 +86,16 @@ class Service_ProviderAdmin(admin.ModelAdmin):
 #########################----------------------------------Disease Section Admin-----------------------------------##################
 @admin.register(DiseaseMaster)
 class DiseaseMasterAdmin(admin.ModelAdmin):
-    list_display = ('id','name','symptom','treatmentbefore','treatmentfield','getlanguage')
+    list_display = ('id','name','symptom','treatmentbefore','treatmentfield','getlanguage','get_combined_crop_name')
     list_filter=('fk_crops','fk_language')
     def getlanguage(self,obj):
         return obj.fk_language.language if obj.fk_language else None
     getlanguage.short_description='Language'
+
+    def get_combined_crop_name(self, obj):
+        eng_crop_name = obj.fk_crops.eng_crop.crop_name if obj.fk_crops and obj.fk_crops.eng_crop else ""
+        hin_crop_name = obj.fk_crops.hin_crop.crop_name if obj.fk_crops and obj.fk_crops.hin_crop else ""
+        return f"{eng_crop_name} / {hin_crop_name}".strip(" / ")
 
 @admin.register(Disease_Images_Master)
 class Disease_Images_MasterAdmin(admin.ModelAdmin):
@@ -102,16 +107,17 @@ class Disease_Images_MasterAdmin(admin.ModelAdmin):
 
 @admin.register(DiseaseTranslation)
 class DiseaseTranslationAdmin(admin.ModelAdmin):
-    list_display=('id','getdisease_name','getlanguage','translation','getcrop_name')
+    list_display=('id','getdisease_name','getlanguage','translation','get_combined_crop_name')
     def getlanguage(self,obj):
         return obj.fk_language.language if obj.fk_language else None
     getlanguage.short_description='Language'
 
     def getdisease_name(self,obj):
         return obj.fk_disease.name if obj.fk_disease else None
-    def getcrop_name(self,obj):
-        return obj.fk_crops.crop_name if obj.fk_crops else None
-    getcrop_name.short_description = 'Crop Name'
+    def get_combined_crop_name(self, obj):
+        eng_crop_name = obj.fk_crops.eng_crop.crop_name if obj.fk_crops and obj.fk_crops.eng_crop else ""
+        hin_crop_name = obj.fk_crops.hin_crop.crop_name if obj.fk_crops and obj.fk_crops.hin_crop else ""
+        return f"{eng_crop_name} / {hin_crop_name}".strip(" / ")
     
 ################-----------------------------------------------Disease Video------------------------#############
 @admin.register(DiseaseVideo)
@@ -189,11 +195,11 @@ class CropImagesAdmin(admin.ModelAdmin):
 ###########################################----------------------Crop Variety---------------------------------------#################
 @admin.register(CropVariety)
 class CropVarietyAdmin(admin.ModelAdmin):
-    list_display=('id','getcrop_name','variety','fk_language')
-    search_fields=('variety',)
-    def getcrop_name(self,obj):
-        return obj.fk_crops.crop_name if obj.fk_crops else None
-    getcrop_name.short_description = 'Crop Name'
+    list_display=('id','get_combined_crop_name','eng_name','hin_name')
+    def get_combined_crop_name(self, obj):
+        eng_crop_name = obj.fk_crops.eng_crop.crop_name if obj.fk_crops and obj.fk_crops.eng_crop else ""
+        hin_crop_name = obj.fk_crops.hin_crop.crop_name if obj.fk_crops and obj.fk_crops.hin_crop else ""
+        return f"{eng_crop_name} / {hin_crop_name}".strip(" / ")
 #############--------------------------------------------Community Section---------------------##################### 
 @admin.register(CommunityPost)
 class CommunityPostAdmin(admin.ModelAdmin):
@@ -252,7 +258,7 @@ class PostsLikeAdmin(admin.ModelAdmin):
 #######################--------------------------------------Upload Diseasees--------------------------#################
 @admin.register(Upload_Disease)
 class Uploaded_DiseaseAdmin(admin.ModelAdmin):
-    list_display = ('id','get_service_provider','get_disease_name','get_user','fk_language','state','district'
+    list_display = ('id','get_service_provider','get_disease_name','get_user','fk_language','get_combined_crop_name'
                     )
 
     def get_user(self, obj):
@@ -260,14 +266,16 @@ class Uploaded_DiseaseAdmin(admin.ModelAdmin):
     get_user.short_description = 'User'
 
     def get_service_provider(self, obj):
-        return obj.fk_provider.name if obj.fk_provider else None
-    get_service_provider.short_description = 'Service Provider'
-    get_service_provider.admin_order_field = 'fk_provider__name'
+        eng_name = obj.fk_provider.eng_name if obj.fk_provider and obj.fk_provider.eng_name else ""
+        hin_name = obj.fk_provider.hin_name if obj.fk_provider and obj.fk_provider.hin_name else ""
+        return f"{eng_name} / {hin_name}".strip(" / ")
 
-    def get_crop_name(self, obj):
-        return obj.fk_crop.crop_name if obj.fk_crop else None
-    get_crop_name.short_description = 'Crop Name'
-    get_crop_name.admin_order_field = 'fk_crop__crop_name'
+
+
+    def get_combined_crop_name(self, obj):
+        eng_crop_name = obj.fk_crop.eng_crop.crop_name if obj.fk_crop and obj.fk_crop.eng_crop else ""
+        hin_crop_name = obj.fk_crop.hin_crop.crop_name if obj.fk_crop and obj.fk_crop.hin_crop else ""
+        return f"{eng_crop_name} / {hin_crop_name}".strip(" / ")
 
     def get_disease_name(self, obj):
 
@@ -334,7 +342,7 @@ class FruitsStageComplete(admin.ModelAdmin):
 ##################----------------------------------Vegetable POP-----------------------############
 @admin.register(VegetablePop)
 class VegetablePopAdmin(admin.ModelAdmin):
-    list_display = ('stages','description','stage_number', 'get_combined_crop_name','audio','preference','video')
+    list_display = ('stages','description','stage_number', 'get_combined_crop_name','fk_croptype','audio','preference','video')
     list_filter = ('stages','fk_language','fk_crop')
     search_fields = ('stages', 'description')
     def get_combined_crop_name(self, obj):
@@ -407,10 +415,11 @@ class WeatherPopNotificationAdmin(admin.ModelAdmin):
 ################################------------------------------Crop Suggestion----------------#####################
 @admin.register(SuggestedCrop)
 class SuggestedCropAdmin(admin.ModelAdmin):
-    list_display = ('season', 'start_month', 'end_month', 'weather_temperature', 'cost_of_cultivation', 'market_price', 'production', 'getcrop_name', 'fk_language')
-    def getcrop_name(self,obj):
-        return obj.fk_crop.crop_name if obj.fk_crop else None
-    getcrop_name.short_description = 'Crop Name'
+    list_display = ('season', 'start_month', 'end_month', 'weather_temperature', 'cost_of_cultivation', 'market_price', 'production', 'get_combined_crop_name', 'fk_language')
+    def get_combined_crop_name(self, obj):
+        eng_crop_name = obj.fk_crop.eng_crop.crop_name if obj.fk_crop and obj.fk_crop.eng_crop else ""
+        hin_crop_name = obj.fk_crop.hin_crop.crop_name if obj.fk_crop and obj.fk_crop.hin_crop else ""
+        return f"{eng_crop_name} / {hin_crop_name}".strip(" / ")
 
 ######################------------------------------OTP Verification-------------- #####################
 @admin.register(OTPVerification)
@@ -420,12 +429,13 @@ class OTPVerificationAdmin(admin.ModelAdmin):
 ###############################--------------------------------------Disease Section-------------######################
 @admin.register(DiseaseProductInfo)
 class DiseaseProductInfoAdmin(admin.ModelAdmin):
-    list_display = ('id','getdis_name')
+    list_display = ('id','getdis_name','get_combined_crop_name')
     search_fields = ('fk_disease__name', 'fk_product__productName') 
     #list_filter = ('fk_crop', 'fk_disease', 'fk_product')
-    def getcrop_name(self,obj):
-        return obj.fk_crop.crop_name if obj.fk_crop else None
-    getcrop_name.short_description = 'Crop Name'
+    def get_combined_crop_name(self, obj):
+        eng_crop_name = obj.fk_crop.eng_crop.crop_name if obj.fk_crop and obj.fk_crop.eng_crop else ""
+        hin_crop_name = obj.fk_crop.hin_crop.crop_name if obj.fk_crop and obj.fk_crop.hin_crop else ""
+        return f"{eng_crop_name} / {hin_crop_name}".strip(" / ")
 
     def getdis_name(self,obj):
         return obj.fk_disease.name if obj.fk_disease else None

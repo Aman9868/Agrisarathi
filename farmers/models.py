@@ -163,11 +163,11 @@ class DiseaseVideo(models.Model):
 
 ####################################################---------------Crop Variety---------------------#################
 class CropVariety(models.Model):
-    fk_crops=models.ForeignKey(CropMaster,blank=True,null=True,on_delete=models.CASCADE)
+    fk_crops=models.ForeignKey(CropMapper,blank=True,null=True,on_delete=models.CASCADE)
     created_at=models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    fk_language = models.ForeignKey(LanguageSelection, on_delete=models.CASCADE, null=True, blank=True)
-    variety=models.CharField(max_length=100,null=True,blank=True)
+    eng_name=models.CharField(max_length=100,null=True,blank=True)
+    hin_name=models.CharField(max_length=100,null=True,blank=True)
 
 
 ##########################----------------------------FARMER Profile-------------------------------###########################
