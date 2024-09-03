@@ -29,6 +29,8 @@ develop-eggs/
 dist/
 downloads/
 eggs/
+Agrisarthi/settings.py
+Agrisarthi/settings/
 .eggs/
 lib/
 lib64/

@@ -12,6 +12,7 @@ from rest_framework_simplejwt.exceptions import TokenError
 from django.utils import timezone
 from django.shortcuts import get_object_or_404
 from fponsuppliers.backends import *
+from django.db import transaction
 from rest_framework import status
 from datetime import timedelta
 import traceback
@@ -404,18 +405,21 @@ class GetStateWiseDistrict(APIView):
 #################--------------------------------------------Service Providers-----------------------------########################
 class ServiceProviderList(APIView):
     permission_classes = [IsAuthenticated]
+
     def get(self, request):
-        user=request.user
+        user = request.user
         print(f"User is {user.user_type}")
         try:
             user_language = request.query_params.get('user_language')
-            if user.user_type=='farmer':
+            if user.user_type == 'farmer':
                 if user_language:
-                    obj = Service_Provider.objects.filter(fk_language_id=user_language)
-                    serializer = ServiceProviderSerializer(obj, many=True)
+                    service_providers = Service_Provider.objects.filter(is_deleted=False)
+                    serializer = ServiceProviderSerializer(
+                        service_providers, many=True, context={'user_language': user_language}
+                    )
                     return Response({'status': 'success', 'data': serializer.data}, status=status.HTTP_200_OK)
                 else:
-                    return Response({'status': 'error', 'message': 'user_language is required'}, status=status.HTTP_400_BAD_REQUEST)
+                    return Response({"error": "user_language parameter is required"}, status=status.HTTP_400_BAD_REQUEST)
             else:
                 return Response({'status': 'error', 'message': 'User type is not farmer'}, status=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
@@ -433,48 +437,54 @@ class ServiceProviderList(APIView):
 ###############################-----------------------------Initial Screen Crops---------------#########################      
 class GetInitialScreenCrops(APIView):
     permission_classes = [IsAuthenticated]
+    
     def get(self, request):
-        user=request.user
-        print(f"User is {user}")
+        user = request.user
+        user_language = request.query_params.get('user_language', '1')  # Default to '1' if not provided
+        
+        if user.user_type != "farmer":
+            return Response({"error": "User is not a farmer"}, status=status.HTTP_403_FORBIDDEN)
+        
         try:
-            if user.user_type=="farmer":
-                crop_types = POPTypes.objects.all()
-                crop_data_by_type_and_season = {}
-
-                for crop_type in crop_types:
-                    crops = CropMaster.objects.filter(
-                        fk_crop_type=crop_type,
-                        fk_language_id=request.query_params.get('user_language')
-                    )
-                    serializer = CropMasterSerializer(crops, many=True)
-                    print(f"Crop Data: {serializer.data}")
-
-                    for crop in serializer.data:
-                        crop_type_name = crop_type.name
-                        season_name = crop['season_name']
-                        season_id = crop['season_id']
-                        croptype_id=crop['croptype_id']
-
-                        crop_data = {
-                        'id': crop['id'],
-                        'status': crop['crop_status'],
-                        'crop_name': crop['crop_name'],
-                        'season_name': season_name,
-                        'croptype_id':croptype_id,
-                        'season_id': season_id,
-                        'crop_images': crop['crop_images']
-                        }
-
-                        if crop_type_name in crop_data_by_type_and_season:
-                            crop_data_by_type_and_season[crop_type_name].append(crop_data)
-                        else:
-                            crop_data_by_type_and_season[crop_type_name] = [crop_data]
-
-                return Response(crop_data_by_type_and_season)
-            else:
-                return Response({"error": "User is not a farmer"}, status=status.HTTP_403_FORBIDDEN)
+            crop_data_by_type_and_season = {}
+            crop_mappers = CropMapper.objects.filter(is_deleted=False)
+            
+            for crop_mapper in crop_mappers:
+                if user_language == '1':
+                    crop = crop_mapper.eng_crop
+                elif user_language == '2':
+                    crop = crop_mapper.hin_crop
+                else:
+                    return Response({"error": "Invalid language parameter"}, status=status.HTTP_400_BAD_REQUEST)
                 
-
+                if crop:
+                    pop_mapper = crop_mapper.pop_map
+                    season_mapper = pop_mapper.season_map if pop_mapper else None
+                    
+                    crop_type = pop_mapper.eng_pop if user_language == '1' else pop_mapper.hin_pop
+                    season = season_mapper.eng_season if user_language == '1' else season_mapper.hin_season
+                    crop_image_obj = CropImages.objects.filter(fk_cropmaster=crop_mapper).first()
+                    crop_image_url = crop_image_obj.crop_image.url if crop_image_obj and crop_image_obj.crop_image else None
+                    
+                    crop_data = {
+                        'id': crop_mapper.id,  
+                        'status': crop.crop_status,
+                        'crop_name': crop.crop_name,
+                        'season_name': season.season if season else None,
+                        'croptype_id': pop_mapper.id if pop_mapper else None, 
+                        'season_id': season_mapper.id if season_mapper else None,
+                        'crop_image': crop_image_url  
+                    }
+                    
+                    crop_type_name = crop_type.name if crop_type else "Unknown"
+                    
+                    if crop_type_name in crop_data_by_type_and_season:
+                        crop_data_by_type_and_season[crop_type_name].append(crop_data)
+                    else:
+                        crop_data_by_type_and_season[crop_type_name] = [crop_data]
+            
+            return Response(crop_data_by_type_and_season)
+        
         except Exception as e:
             error_message = str(e)
             trace = traceback.format_exc()
@@ -521,9 +531,8 @@ class CropTypes(APIView):
                 return Response({'status': 'error', 'message': 'Missing required field: user_language'}, status=status.HTTP_400_BAD_REQUEST)
 
             print(f"User Language is: {user_language}")
-            res = POPTypes.objects.filter(fk_language_id=user_language)
-            print(f"Queryset result: {res}")
-            data = POPCropTypeSerializer(res,many=True)
+            pop_mappers = POPMapper.objects.filter(is_deleted=False)
+            data = POPCropTypeSerializer(pop_mappers, many=True, context={'user_language': user_language})
             print(f"Data to be returned: {data}")
 
             if not data:
@@ -634,7 +643,7 @@ class FarmerAddGetallLandInfo(APIView):
                     if field in data:
                         setattr(land_address, field, data[field])
                 land_address.save()
-                return Response({'status':'success','message':'Land added successfully'},status=status.HTTP_200_OK)
+                return Response({'status':'success','message':'Land Updated successfully'},status=status.HTTP_200_OK)
             else:
                 return Response({'status':'error','message':'You are not authorized to perform this action'})
         except Exception as e:
@@ -1166,28 +1175,26 @@ class DetectDiseaseAPIView(APIView):
                         return Response({'error': 'Invalid farmer land ID'}, status=status.HTTP_404_NOT_FOUND)
 
                 related_crop_ids = {
-                    '2': ['110', '2'],
-                    '110': ['2', '110'],
-                    '5': ['5', '73'],
-                    '73': ['5', '73'],
+                    '1': ['1', '1'],
+                    '2': ['2', '2'],
                 }
 
                 if filter_type.lower() in ['leaf', 'leaves']:
-                    if crop_id in related_crop_ids['2']:
+                    if crop_id in related_crop_ids['1']:
                         model_name = "Amanaccessassist/finetuner-potato-leaf"
-                    elif crop_id in related_crop_ids['5']:
+                    elif crop_id in related_crop_ids['2']:
                         model_name = "Amanaccessassist/finetune-mango-leaf"
                     else:
                         return Response({'error': 'Invalid crop ID'}, status=status.HTTP_400_BAD_REQUEST)
                 elif filter_type.lower() == 'finished product':
-                    if crop_id in related_crop_ids['2']:
+                    if crop_id in related_crop_ids['1']:
                         model_name = "Amanaccessassist/finetuned-potato-chips"
                     else:
                         return Response({'error': 'Invalid crop ID'}, status=status.HTTP_400_BAD_REQUEST)
                 elif filter_type.lower() == 'crop':
-                    if crop_id in related_crop_ids['2']:
+                    if crop_id in related_crop_ids['1']:
                         model_name = "Amanaccessassist/finetuned-potato-food"
-                    elif crop_id in related_crop_ids['5']:
+                    elif crop_id in related_crop_ids['2']:
                         model_name = "Amanaccessassist/finetuned-mango-food"
                     else:
                         return Response({'error': 'Invalid crop ID'}, status=status.HTTP_400_BAD_REQUEST)
@@ -1333,7 +1340,7 @@ class GetSingleDiagnosisReport(APIView):
             product_disease = DiseaseProductInfo.objects.filter(
                 fk_disease__name=disease,
                 fk_crop_id=cropid
-            ).select_related('fk_product')
+            ).prefetch_related('fk_product')
             product_disease_results = DiseaseProductInfoSerializer(product_disease, many=True).data
 
             return Response({
@@ -1588,7 +1595,7 @@ class Fertilizerswithtest(APIView):
             phosphorous = data.get('phosphorous')
             potassium = data.get('potassium')
 
-            if crop_id not in [2, 110]:
+            if crop_id not in [1]:
                 return Response({'error': 'Crop ID is not supported'}, status=status.HTTP_400_BAD_REQUEST)
 
             if nitrogen is None or phosphorous is None or potassium is None:
@@ -1676,7 +1683,7 @@ class Fertilizerswithtest(APIView):
             farm_id = request.query_params.get('farm_id')
             user_language = request.query_params.get('user_language')
             crop_id = request.query_params.get('crop_id')
-            if crop_id not in ["2", "110"]:
+            if crop_id not in ["1"]:
                 return Response({'error': 'Crop ID is not supported'}, status=status.HTTP_400_BAD_REQUEST)
 
             if not user_language:
@@ -1698,8 +1705,13 @@ class Fertilizerswithtest(APIView):
                     return Response({'error': 'Invalid farmer land ID'}, status=status.HTTP_404_NOT_FOUND)
 
             try:
-                crop_name = CropMaster.objects.get(id=crop_id).crop_name
-            except CropMaster.DoesNotExist:
+                if user_language=="1":
+                    crop_name = CropMapper.objects.get(id=crop_id).eng_crop.crop_name
+                    print(f"English Crop Name is :{crop_name}")
+                elif user_language=="2":
+                    crop_name = CropMapper.objects.get(id=crop_id).hin_crop.crop_name
+                    print(f"Hindi Crop Name is :{crop_name}")
+            except CropMapper.DoesNotExist:
                 return Response({'error': 'Invalid Crop ID'}, status=status.HTTP_404_NOT_FOUND)
 
             fertilizers = Fertilizer.objects.filter(fk_language=user_language, fk_crop_id=crop_id)
@@ -1775,7 +1787,7 @@ class AdvanceFertilizercalculator(APIView):
             urea = data.get('urea', 0)
             ssp = data.get('ssp', 0)
             mop = data.get('mop', 0)
-            if crop_id not in [2, 110]:
+            if crop_id not in [1]:
                 return Response({'error': 'Crop ID is not supported'}, status=status.HTTP_400_BAD_REQUEST)
             if user.user_type=="farmer":
                 try:
@@ -1784,8 +1796,12 @@ class AdvanceFertilizercalculator(APIView):
                     return Response({'error': 'FarmerProfile not found for user_id'}, status=status.HTTP_404_NOT_FOUND)
             
                 try:
-                    crop_name = CropMaster.objects.get(id=crop_id).crop_name
-                    print(f"Crop Name:{crop_name}")
+                    if user_language=="1":
+                        crop_name = CropMapper.objects.get(id=crop_id).eng_crop.crop_name
+                        print(f"English Crop Name is :{crop_name}")
+                    elif user_language=="2":
+                        crop_name = CropMapper.objects.get(id=crop_id).hin_crop.crop_name
+                        print(f"Hindi Crop Name is :{crop_name}")
                 except CropMaster.DoesNotExist:
                     return Response({'error': 'Invalid Crop ID'}, status=status.HTTP_404_NOT_FOUND)
             
@@ -1796,6 +1812,7 @@ class AdvanceFertilizercalculator(APIView):
                         return Response({'error': 'Invalid farmer land ID'}, status=status.HTTP_404_NOT_FOUND)
             
                 fertilizers = Fertilizer.objects.filter(fk_language=user_language, fk_crop_id=crop_id)
+                print(f"Fertilizer object :{fertilizers}")
                 if not fertilizers.exists():
                     return Response({'error': f'No fertilizers data found for the crop: {crop_name}'}, status=status.HTTP_404_NOT_FOUND)
 
@@ -2014,12 +2031,117 @@ class CropSuggestion(APIView):
 
 
 ##########################################------VEGETABLE POP-----------#########################################
+def sync_multi_language_data(farmer, farm, crop_id, current_language_id,filter_type):
+    all_languages = LanguageSelection.objects.all()
+    for lang in all_languages:
+        if lang.id != current_language_id:
+            current_preferences = VegetablePreferenceCompletion.objects.filter(
+                fk_farmer=farmer,
+                fk_farmland=farm,
+                fk_croptype_id=filter_type,
+                fk_crop_id=crop_id,
+                fk_language_id=current_language_id
+            )
+            print(f"Current Preferences are:{current_preferences}")
+
+            for pref in current_preferences:
+                existing_prefs = VegetablePreferenceCompletion.objects.filter(
+                    fk_farmer=farmer,
+                    fk_farmland=farm,
+                    fk_crop_id=crop_id,
+                    fk_croptype_id=filter_type,
+                    fk_language_id=lang.id,
+                    preference_number=pref.preference_number
+                )
+                print(f"Existing Preferences are:{existing_prefs}")
+
+                if existing_prefs.exists():
+                    existing_pref = existing_prefs.first()
+                    existing_pref.name = pref.name
+                    existing_pref.start_date = pref.start_date
+                    existing_pref.completion_date = pref.completion_date
+                    existing_pref.is_completed = pref.is_completed
+                    existing_pref.total_days = pref.total_days
+                    existing_pref.progress = pref.progress
+                    existing_pref.save()
+                else:
+                    VegetablePreferenceCompletion.objects.create(
+                        fk_farmer=farmer,
+                        fk_farmland=farm,
+                        fk_crop_id=crop_id,
+                        fk_croptype_id=filter_type,
+                        fk_language_id=lang.id,
+                        preference_number=pref.preference_number,
+                        name=pref.name,
+                        start_date=pref.start_date,
+                        completion_date=pref.completion_date,
+                        is_completed=pref.is_completed,
+                        total_days=pref.total_days,
+                        progress=pref.progress
+                    )
+
+    # Sync VegetableStageCompletion
+    for lang in all_languages:
+        if lang.id != current_language_id:
+            current_stages = VegetableStageCompletion.objects.filter(
+                fk_farmer=farmer,
+                fk_farmland=farm,
+                fk_crop_id=crop_id,
+                fk_croptype_id=filter_type,
+                fk_language_id=current_language_id
+            )
+
+            for stage in current_stages:
+                try:
+                    target_vegetable_pop = VegetablePop.objects.get(
+                        fk_crop_id=crop_id,
+                        fk_language_id=lang.id,
+                        fk_croptype_id=filter_type,
+                        stage_number=stage.stage_number,
+                        preference=stage.vegetable_pop.preference
+                    )
+                    print(f"Target vegetabel Pop :{target_vegetable_pop}")
+
+                    existing_stages = VegetableStageCompletion.objects.filter(
+                        vegetable_pop=target_vegetable_pop,
+                        fk_farmer=farmer,
+                        fk_farmland=farm,
+                        fk_crop_id=crop_id,
+                        fk_croptype_id=filter_type,
+                        fk_language_id=lang.id,
+                        stage_number=stage.stage_number,
+                    )
+
+                    if existing_stages.exists():
+                        existing_stage = existing_stages.first()
+                        existing_stage.start_date = stage.start_date
+                        existing_stage.completion_date = stage.completion_date
+                        existing_stage.is_completed = stage.is_completed
+                        existing_stage.total_days_spent = stage.total_days_spent
+                        existing_stage.save()
+                    else:
+                        VegetableStageCompletion.objects.create(
+                            vegetable_pop=target_vegetable_pop,
+                            fk_farmer=farmer,
+                            fk_farmland=farm,
+                            fk_crop_id=crop_id,
+                            fk_croptype_id=filter_type,
+                            fk_language_id=lang.id,
+                            stage_number=stage.stage_number,
+                            start_date=stage.start_date,
+                            completion_date=stage.completion_date,
+                            is_completed=stage.is_completed,
+                            total_days_spent=stage.total_days_spent
+                        )
+                except VegetablePop.DoesNotExist:
+                    return Response({'error': 'Vegetable Pop not found'}, status=status.HTTP_404_NOT_FOUND)
 class VegetableStagesAPIView(APIView):
     permission_classes = [IsAuthenticated]
+    @transaction.atomic
     def post(self, request, format=None):
         user = request.user
         crop_id = request.data.get('crop_id')
-        farm_id=request.data.get('land_id')
+        farm_id = request.data.get('land_id')
         filter_type = request.data.get('filter_type')
         user_language = request.data.get('user_language')
 
@@ -2033,12 +2155,15 @@ class VegetableStagesAPIView(APIView):
                     farmer = FarmerProfile.objects.get(user=user)
                 except FarmerProfile.DoesNotExist:
                     return Response({'message': 'Farmer Not Found'}, status=status.HTTP_404_NOT_FOUND)
-                farm=None
+                farm = None
                 if farm_id:
                     try:
                         farm = FarmerLandAddress.objects.get(id=farm_id, fk_farmer=farmer, fk_crops__id=crop_id)
                     except FarmerLandAddress.DoesNotExist:
                         return Response({'error': 'Invalid farmer land ID'}, status=status.HTTP_404_NOT_FOUND)
+
+                # Synchronize data across all languages
+                sync_multi_language_data(farmer, farm, crop_id, user_language,filter_type)
 
                 veges = VegetablePop.objects.filter(
                     fk_crop_id=crop_id,
@@ -2058,42 +2183,51 @@ class VegetableStagesAPIView(APIView):
 
                 preference_completion_map = {}
                 for pref in preferences:
-                    preference_completion, created = VegetablePreferenceCompletion.objects.get_or_create(
+                    try:
+                        preference_completion = VegetablePreferenceCompletion.objects.get(
                         fk_farmer=farmer,
                         fk_farmland=farm,
                         fk_crop_id=crop_id,
                         fk_language_id=user_language,
                         fk_croptype_id=filter_type,
                         preference_number=pref['preference'],
-                        name=pref['stages'],
-                        defaults={'start_date': None}
-                    )
+                            )
+                        created = False
+                    except VegetablePreferenceCompletion.MultipleObjectsReturned:
+                        preference_completion = VegetablePreferenceCompletion.objects.filter(
+                                                fk_farmer=farmer,
+                                                fk_farmland=farm,
+                                                fk_crop_id=crop_id,
+                                                fk_language_id=user_language,
+                                                fk_croptype_id=filter_type,
+                                                preference_number=pref['preference']
+                                                ).first()
+                    except VegetablePreferenceCompletion.DoesNotExist:
+                        preference_completion = VegetablePreferenceCompletion.objects.create(
+                                                fk_farmer=farmer,
+                                                fk_farmland=farm,
+                                                fk_crop_id=crop_id,
+                                                fk_language_id=user_language,
+                                                fk_croptype_id=filter_type,
+                                                preference_number=pref['preference'],
+                                                name=pref['stages'],
+                                                start_date=None
+                                                    )
+                        created = True
                     preference_completion_map[pref['preference']] = preference_completion
+                    print(f"Preference Complete for :{preference_completion}")
 
                 for vege in veges:
-                    stage_completions = VegetableStageCompletion.objects.filter(
+                    stage_completion, created = VegetableStageCompletion.objects.get_or_create(
                         vegetable_pop=vege,
                         fk_farmer=farmer,
                         fk_farmland=farm,
                         fk_language_id=user_language,
                         fk_croptype_id=filter_type,
                         fk_crop_id=crop_id,
-                        stage_number=vege.stage_number
+                        stage_number=vege.stage_number,
+                        defaults={'start_date': None}
                     )
-
-                    if stage_completions.exists():
-                        stage_completion = stage_completions.first()
-                    else:
-                        stage_completion, created = VegetableStageCompletion.objects.get_or_create(
-                            vegetable_pop=vege,
-                            fk_farmer=farmer,
-                            fk_farmland=farm,
-                            fk_language_id=user_language,
-                            fk_croptype_id=filter_type,
-                            fk_crop_id=crop_id,
-                            stage_number=vege.stage_number,
-                            defaults={'start_date': None}
-                        )
 
                     preference_completion = preference_completion_map.get(vege.preference)
 
@@ -2170,15 +2304,43 @@ class VegetableStagesAPIView(APIView):
                             ).order_by('stage_number')
                             
                             if next_preference_stages.exists():
-                                next_preference_completion, _ = VegetablePreferenceCompletion.objects.get_or_create(
-                                    fk_farmer=farmer,
-                                    fk_farmland=farm,
-                                    fk_crop_id=crop_id,
-                                    fk_language_id=user_language,
-                                    fk_croptype_id=filter_type,
-                                    preference_number=next_preference,
-                                    defaults={'start_date': today, 'is_completed': False, 'progress': 0}
-                                )
+                                try:
+                                    next_preference_completion = VegetablePreferenceCompletion.objects.get(
+                                                        fk_farmer=farmer,
+                                                        fk_farmland=farm,
+                                                        fk_crop_id=crop_id,
+                                                        fk_language_id=user_language,
+                                                        fk_croptype_id=filter_type,
+                                                        preference_number=next_preference
+                                                        )
+                                except VegetablePreferenceCompletion.MultipleObjectsReturned:
+                                    next_preference_completion = VegetablePreferenceCompletion.objects.filter(
+                                                            fk_farmer=farmer,
+                                                            fk_farmland=farm,
+                                                            fk_crop_id=crop_id,
+                                                            fk_language_id=user_language,
+                                                            fk_croptype_id=filter_type,
+                                                            preference_number=next_preference
+                                                                ).first()
+                                except VegetablePreferenceCompletion.DoesNotExist:
+                                    next_preference_completion = VegetablePreferenceCompletion.objects.create(
+                                                                fk_farmer=farmer,
+                                                                fk_farmland=farm,
+                                                                fk_crop_id=crop_id,
+                                                                fk_language_id=user_language,
+                                                                fk_croptype_id=filter_type,
+                                                                preference_number=next_preference,
+                                                                start_date=today,
+                                                                is_completed=False,
+                                                                progress=0
+                                                                        )
+                                print(f"Next Prefrences Data :{next_preference_completion}")
+                            if not created:
+                                next_preference_completion = VegetablePreferenceCompletion.objects.filter(
+                                                        fk_farmer=farmer,fk_farmland=farm,fk_crop_id=crop_id,
+                                                         fk_language_id=user_language,fk_croptype_id=filter_type,
+                                                        preference_number=next_preference).first()
+
                                 for next_stage in next_preference_stages:
                                     VegetableStageCompletion.objects.get_or_create(
                                         vegetable_pop=next_stage,
@@ -2204,7 +2366,7 @@ class VegetableStagesAPIView(APIView):
                             'Category': product.Category,
                             'supplier_ids': supplier_ids,
                             'price': latest_price.unit_price if latest_price else None
-                                    }
+                        }
                         products.append(product_data)
 
                     # Add stage data to stage_data list
@@ -2243,10 +2405,12 @@ class VegetableStagesAPIView(APIView):
 ###-------Mark Stage Complete
 class MarkVegetableStageCompleteAPIView(APIView):
     permission_classes = [IsAuthenticated]
+
+    @transaction.atomic
     def post(self, request, format=None):
         user = request.user
         crop_id = request.data.get('crop_id')
-        farm_id=request.data.get('land_id')
+        farm_id = request.data.get('land_id')
         filter_type = request.data.get('filter_type')
         preference_number = request.data.get('preference_number')
         submit_task = request.FILES.get('submit_task')
@@ -2263,7 +2427,8 @@ class MarkVegetableStageCompleteAPIView(APIView):
                     farmer = FarmerProfile.objects.get(user=user)
                 except FarmerProfile.DoesNotExist:
                     return Response({'message': 'Farmer Not Found'}, status=status.HTTP_404_NOT_FOUND)
-                farm=None
+
+                farm = None
                 if farm_id:
                     try:
                         farm = FarmerLandAddress.objects.get(id=farm_id, fk_farmer=farmer, fk_crops__id=crop_id)
@@ -2277,6 +2442,7 @@ class MarkVegetableStageCompleteAPIView(APIView):
                         fk_croptype_id=filter_type,
                         fk_language_id=user_language
                     )
+                    print(f"Stages are :{stages}")
 
                     if not stages.exists():
                         return Response({'message': 'No stages found for this preference'}, status=status.HTTP_404_NOT_FOUND)
@@ -2294,6 +2460,7 @@ class MarkVegetableStageCompleteAPIView(APIView):
                             fk_language_id=user_language,
                             stage_number=stage.stage_number
                         )
+                        print(f"Stage completions are :{stage_completions}")
 
                         if stage_completions.exists():
                             stage_completion = stage_completions.first()
@@ -2316,6 +2483,7 @@ class MarkVegetableStageCompleteAPIView(APIView):
                                 stage_number=stage.stage_number,
                                 defaults={'start_date': today, 'completion_date': today, 'is_completed': True, 'total_days_spent': 0}
                             )
+                            print(f"Stage Completion : {stage_completion}")
 
                         completed_stages_data.append({
                             'stage_id': stage_completion.vegetable_pop.id,
@@ -2325,17 +2493,17 @@ class MarkVegetableStageCompleteAPIView(APIView):
                         })
 
                     # Handle preference completion
-                    preference_completion, created = VegetablePreferenceCompletion.objects.get_or_create(
+                    preference_completion_queryset = VegetablePreferenceCompletion.objects.filter(
                         fk_farmer=farmer,
                         fk_farmland=farm,
                         fk_crop_id=crop_id,
                         fk_croptype_id=filter_type,
                         fk_language_id=user_language,
-                        preference_number=preference_number,
-                        defaults={'start_date': today, 'completion_date': today, 'is_completed': True, 'total_days': 0, 'progress': 100}
+                        preference_number=preference_number
                     )
 
-                    if not created:
+                    if preference_completion_queryset.exists():
+                        preference_completion = preference_completion_queryset.latest('id')
                         preference_completion.completion_date = today
                         preference_completion.is_completed = True
                         if preference_completion.start_date:
@@ -2345,6 +2513,21 @@ class MarkVegetableStageCompleteAPIView(APIView):
                             preference_completion.total_days = 0
                         preference_completion.progress = 100
                         preference_completion.save()
+                    else:
+                        preference_completion = VegetablePreferenceCompletion.objects.create(
+                            fk_farmer=farmer,
+                            fk_farmland=farm,
+                            fk_crop_id=crop_id,
+                            fk_croptype_id=filter_type,
+                            fk_language_id=user_language,
+                            preference_number=preference_number,
+                            start_date=today,
+                            completion_date=today,
+                            is_completed=True,
+                            total_days=0,
+                            progress=100
+                        )
+                        print(f"Preference Completion :{preference_completion}")
 
                     # Initialize the next preference
                     next_preference_number = int(preference_number) + 1
@@ -2354,9 +2537,10 @@ class MarkVegetableStageCompleteAPIView(APIView):
                         fk_language_id=user_language,
                         fk_croptype_id=filter_type
                     ).order_by('stage_number')
+                    print(f"Next Preference Stages are :{next_preference_stages}")
 
                     if next_preference_stages.exists():
-                        next_preference_completion, _ = VegetablePreferenceCompletion.objects.get_or_create(
+                        VegetablePreferenceCompletion.objects.get_or_create(
                             fk_farmer=farmer,
                             fk_farmland=farm,
                             fk_crop_id=crop_id,
@@ -2378,6 +2562,8 @@ class MarkVegetableStageCompleteAPIView(APIView):
                                 defaults={'start_date': today, 'is_completed': False, 'total_days_spent': 0}
                             )
 
+                    sync_multi_language_data(farmer, farm, crop_id, user_language, filter_type)
+
                     coins_added = 20 if submit_task else 10
                     farmer.coins += coins_added
                     farmer.save()
@@ -2387,6 +2573,7 @@ class MarkVegetableStageCompleteAPIView(APIView):
                         'coins_added': coins_added,
                         'total_coins': farmer.coins
                     })
+
             else:
                 return Response({'message': 'User is not a farmer'}, status=status.HTTP_403_FORBIDDEN)
 
@@ -2474,68 +2661,78 @@ class VegetableProgressAPIView(APIView):
 #######-----------------Weather Notifcation
 class GetVegetablePopNotification(APIView):
     permission_classes = [IsAuthenticated]
-    def get(self, request):
-        user = request.user
-        data = request.query_params  # Use query_params for GET requests
-        user_language = data.get('user_language')
-        crop_id = data.get('crop_id')
-        farm_id = data.get('land_id')
-        filter_type = data.get('filter_type')
-        weather_condition = data.get('weather_condition', [])
 
-        required_fields = ['crop_id', 'filter_type', 'user_language']
-        for field in required_fields:
-            if not data.get(field):
-                return Response({'message': f'Missing or empty field: {field}'}, status=status.HTTP_400_BAD_REQUEST)
+    def post(self, request):
+        data = request.data 
+        crops = data.get('crops', [])  
 
+        if not crops:
+            return Response({'message': 'Missing or empty field: crops'}, status=status.HTTP_400_BAD_REQUEST)
         try:
-            if user.user_type == "farmer":
+
+            responses = []
+            for crop in crops:
+                crop_id = crop.get('crop_id')
+                land_id = crop.get('farm_id')
+                filter_type = crop.get('filter_type')
+                user_language = crop.get('user_language')
+                weather_conditions = crop.get('weather_conditions', [])
+
+                if not filter_type or not user_language:
+                    return Response({'message': f'Missing or empty field: filter_type, or user_language for crop_id {crop_id}'}, status=status.HTTP_400_BAD_REQUEST)
+
                 try:
-                    farmer = FarmerProfile.objects.get(user=user)
+                    farmer = FarmerProfile.objects.get(user=request.user)
                 except FarmerProfile.DoesNotExist:
                     return Response({'message': 'Farmer Not Found'}, status=status.HTTP_404_NOT_FOUND)
 
-                farm = None
-                if farm_id:
+                farm=None
+                if land_id:
                     try:
-                        farm = FarmerLandAddress.objects.get(id=farm_id, fk_farmer=farmer, fk_crops__id=crop_id)
+                        farm = FarmerLandAddress.objects.get(id=land_id, fk_farmer=farmer, fk_crops__id=crop_id)
                     except FarmerLandAddress.DoesNotExist:
-                        return Response({'message': 'Land not Found'}, status=status.HTTP_404_NOT_FOUND)
-                
+                        return Response({'error': 'Invalid farmer land ID'}, status=status.HTTP_404_NOT_FOUND)
+
                 preference_completion = VegetablePreferenceCompletion.objects.filter(
-                    fk_farmer=farmer,
-                    fk_farmland=farm,
-                    fk_crop_id=crop_id,
-                    fk_croptype_id=filter_type,
-                    is_completed=False
-                ).order_by('preference_number').first()
+                fk_farmer=farmer,
+                fk_farmland=farm,
+                fk_crop_id=crop_id,
+                fk_croptype_id=filter_type,
+                is_completed=False
+                    ).order_by('preference_number').first()
+                print(f"Preferences Found:{preference_completion}")
 
                 if not preference_completion:
-                    return Response({'message': 'All preferences are completed or not found'}, status=status.HTTP_404_NOT_FOUND)
+                    responses.append({
+                    'crop_id': crop_id,
+                    'message': 'All preferences are completed or not found'
+                })
+                    continue
 
                 preference_completion_serializer = VegetablePrefrencesSerializer(preference_completion)
+                print(f"Prefrences Found:{preference_completion_serializer.data}")
+                notification_messages = WeatherPopNotification.objects.filter(
+                fk_weather_condition__condition__in=weather_conditions,
+                preference_number=preference_completion.preference_number,
+                fk_language_id=user_language,
+                fk_crops_id=crop_id,
+                fk_croptype_id=filter_type
+                                 )
+                print(f"Notification Messages Found:{notification_messages}")
 
-                notification_message = WeatherPopNotification.objects.filter(
-                    fk_weather_condition__condition__in=weather_condition,
-                    preference_number=preference_completion.preference_number,
-                    fk_language_id=user_language,
-                    fk_crops_id=crop_id,
-                    fk_croptype_id=filter_type
-                ).first()
-
-                if notification_message:
-                    notification_serializer = WeatherNotificationSerializer(notification_message)
-                    return Response({
-                        'notification': notification_serializer.data,
-                        'preference': preference_completion_serializer.data
-                    }, status=status.HTTP_200_OK)
+                if notification_messages.exists():
+                    notification_serializers = WeatherNotificationSerializer(notification_messages, many=True)
+                    responses.append({
+                    'crop_id': crop_id,
+                    'notifications': notification_serializers.data
+                    })
                 else:
-                    return Response({
-                        'message': 'No notification found for the current weather condition and preference',
-                        'preference': preference_completion_serializer.data
-                    }, status=status.HTTP_404_NOT_FOUND)
-            else:
-                return Response({'message': 'User is not a farmer'}, status=status.HTTP_403_FORBIDDEN)
+                    responses.append({
+                    'crop_id': crop_id,
+                    'message': 'No notification found for the current weather conditions and preference',
+                })
+
+            return Response({'results': responses}, status=status.HTTP_200_OK)
         except Exception as e:
             error_message = str(e)
             trace = traceback.format_exc()
@@ -2547,7 +2744,7 @@ class GetVegetablePopNotification(APIView):
                     "traceback": trace
                 },
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )   
+            )
         
 ##########################################---------------SPICES POP---------#########################################
 class SpicesStagesAPIView(APIView):

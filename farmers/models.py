@@ -28,12 +28,13 @@ class LanguageSelection(models.Model):
 
 ###############--------------------------------Service Providers-----------------------------######################    
 class Service_Provider(models.Model):
-    name =  models.CharField(null=True,blank=True,max_length=100)
+    eng_name =  models.CharField(null=True,blank=True,max_length=100)
+    hin_name =  models.CharField(null=True,blank=True,max_length=100)
     service_provider_pic = models.FileField(upload_to="service_provider/", blank=True, null=True)
     paid_or_free = models.BooleanField(default=False, blank=True, null=True)
     created_at=models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    fk_language=models.ForeignKey(LanguageSelection,on_delete=models.CASCADE,null=True,blank=True)
+    is_deleted = models.BooleanField(default=False)
 
 #####################------------------------------------States--------------------#################
 class StateMaster(models.Model):
@@ -41,6 +42,7 @@ class StateMaster(models.Model):
     created_at=models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     fk_language=models.ForeignKey(LanguageSelection,on_delete=models.CASCADE,null=True,blank=True)
+    is_deleted = models.BooleanField(default=False)
 ##################################--------------------District---------------------#############
 class DistrictMaster(models.Model):
     fk_state = models.ForeignKey(StateMaster, on_delete=models.CASCADE, null=True, blank=True)
@@ -48,6 +50,7 @@ class DistrictMaster(models.Model):
     district=models.CharField(null=True, blank=True, max_length=100)
     created_at=models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    is_deleted = models.BooleanField(default=False)
 ########################------------------------------------Current News----------------------###################
 class CurrentNews(models.Model):
     title=models.CharField(max_length=5000,null=True,blank=True)
@@ -65,6 +68,9 @@ class SeasonMaster(models.Model):
     fk_language=models.ForeignKey(LanguageSelection,on_delete=models.CASCADE,null=True,blank=True)
     created_at=models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    is_deleted = models.BooleanField(default=False)
+
+
 
 class POPTypes(models.Model):
     name=models.CharField(max_length=100,null=True,blank=True)
@@ -72,6 +78,7 @@ class POPTypes(models.Model):
     fk_language=models.ForeignKey(LanguageSelection,on_delete=models.CASCADE,null=True,blank=True)
     created_at=models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
 ##############--------------------------CROP Details-----
 class CropMaster(models.Model):
     fk_crop_type =models.ForeignKey(POPTypes,on_delete=models.CASCADE,null=True,blank=True)
@@ -81,8 +88,38 @@ class CropMaster(models.Model):
     created_at=models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+########################------------------Season Mapper----------------------------############
+class SeasonMapper(models.Model):
+    eng_season=models.ForeignKey(SeasonMaster,on_delete=models.CASCADE,null=True,blank=True,related_name='engseason')
+    hin_season=models.ForeignKey(SeasonMaster,on_delete=models.CASCADE,null=True,blank=True,related_name='hinseason')
+    created_at=models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    is_deleted = models.BooleanField(default=False)
+
+
+########################------------------POP Mapper----------------------------############
+class POPMapper(models.Model):
+    eng_pop=models.ForeignKey(POPTypes,on_delete=models.CASCADE,null=True,blank=True,related_name='engpop')
+    hin_pop=models.ForeignKey(POPTypes,on_delete=models.CASCADE,null=True,blank=True,related_name='hinpop')
+    season_map=models.ForeignKey(SeasonMapper, on_delete=models.CASCADE,null=True,blank=True,related_name="season_map")
+    created_at=models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    is_deleted = models.BooleanField(default=False)
+
+###################-------------------------Crop Mapper--------------------------###################
+class CropMapper(models.Model):
+    eng_crop=models.ForeignKey(CropMaster,on_delete=models.CASCADE,null=True,blank=True,related_name='engcrop')
+    hin_crop=models.ForeignKey(CropMaster,on_delete=models.CASCADE,null=True,blank=True,related_name='hincrop')
+    pop_map=models.ForeignKey(POPMapper,on_delete=models.CASCADE,null=True,blank=True,related_name='pop_map')
+    created_at=models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    is_deleted = models.BooleanField(default=False)
+
+
+
+########################------------------------------------------
 class CropImages(models.Model):
-    fk_cropmaster = models.ManyToManyField(CropMaster,blank=True)
+    fk_cropmaster = models.ForeignKey(CropMapper,on_delete=models.CASCADE,null=True,blank=True)
     crop_image = models.FileField(upload_to="crops/", blank=True, null=True)
     created_at=models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -101,14 +138,14 @@ class DiseaseMaster(models.Model):
     treatment=models.TextField(null=True,blank=True)
     message=models.TextField(null=True,blank=True)
     fk_language=models.ForeignKey(LanguageSelection,on_delete=models.CASCADE,null=True,blank=True)
-    fk_crops=models.ManyToManyField(CropMaster,blank=True)
+    fk_crops=models.ForeignKey(CropMapper,on_delete=models.CASCADE,null=True,blank=True)
 
 class DiseaseTranslation(models.Model):
     fk_disease = models.ForeignKey(DiseaseMaster, on_delete=models.CASCADE,null=True,blank=True)
     created_at=models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     fk_language = models.ForeignKey(LanguageSelection, on_delete=models.CASCADE,null=True,blank=True)
-    fk_crops=models.ForeignKey(CropMaster,on_delete=models.CASCADE,null=True,blank=True)
+    fk_crops=models.ForeignKey(CropMapper,on_delete=models.CASCADE,null=True,blank=True)
     translation = models.CharField(max_length=255,null=True,blank=True)
 
 class Disease_Images_Master(models.Model):
@@ -141,7 +178,6 @@ class FarmerProfile(models.Model):
     user = models.OneToOneField(CustomUser, on_delete=models.CASCADE, related_name='farmers')
     email = models.EmailField(max_length=255, null=True, blank=True)
     email_verified = models.BooleanField(null=True, blank=True, default=False)
-    fk_crops = models.ManyToManyField(CropMaster, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     name = models.CharField(null=True, blank=True, max_length=100)
@@ -201,7 +237,7 @@ class FarmerLandAddress(models.Model):
     lat1 = models.FloatField(null=True, blank=True, max_length=100)
     lat2 = models.FloatField(null=True, blank=True, max_length=100)
     tehsil=models.CharField(null=True, blank=True, max_length=100)
-    fk_crops=models.ForeignKey(CropMaster,on_delete=models.CASCADE,null=True,blank=True)
+    fk_crops=models.ForeignKey(CropMapper,on_delete=models.CASCADE,null=True,blank=True)
     sowing_date = models.DateField(null=True,blank=True)
     fk_croptype=models.ForeignKey(POPTypes,on_delete=models.CASCADE,null=True,blank=True)
     fk_language=models.ForeignKey(LanguageSelection,on_delete=models.CASCADE,null=True,blank=True)
@@ -213,7 +249,7 @@ class Upload_Disease(models.Model):
     created_dt = models.DateTimeField(auto_now_add=False)
     fk_provider=models.ForeignKey(Service_Provider,on_delete=models.CASCADE,null=True,blank=True)
     fk_user=models.ForeignKey(FarmerProfile,on_delete=models.CASCADE,null=True,blank=True)
-    fk_crop=models.ForeignKey(CropMaster,on_delete=models.CASCADE,null=True,blank=True)
+    fk_crop=models.ForeignKey(CropMapper,on_delete=models.CASCADE,null=True,blank=True)
     fk_disease=models.ForeignKey(DiseaseMaster,on_delete=models.CASCADE,blank=True,null=True)  
     uploaded_image = models.FileField(upload_to="uploaded/", blank=True, null=True)
     filter_type =  models.CharField(null=True,blank=True,max_length=100)
@@ -227,7 +263,7 @@ class Upload_Disease(models.Model):
 
 ###############################----------------------------Disease Product------------------------------#############
 class DiseaseProductInfo(models.Model):
-    fk_crop=models.ManyToManyField(CropMaster,blank=True)
+    fk_crop=models.ForeignKey(CropMapper,on_delete=models.CASCADE,null=True,blank=True)
     fk_disease=models.ForeignKey(DiseaseMaster,on_delete=models.CASCADE,null=True,blank=True)
     fk_product=models.ManyToManyField(ProductDetails,blank=True)
     created_at=models.DateTimeField(auto_now_add=True)
@@ -304,7 +340,7 @@ class SuggestedCrop(models.Model):
     cost_of_cultivation = models.CharField(max_length=500,null=True,blank=True)
     market_price = models.CharField(max_length=500,null=True,blank=True)
     production = models.CharField(max_length=1000,null=True,blank=True)
-    fk_crop=models.ForeignKey(CropMaster,on_delete=models.CASCADE,null=True,blank=True)
+    fk_crop=models.ForeignKey(CropMapper,on_delete=models.CASCADE,null=True,blank=True)
     audio=models.FileField(upload_to="cropsuggest_audio/",blank=True, null=True)
     fk_language=models.ForeignKey(LanguageSelection,on_delete=models.CASCADE,null=True,blank=True)
     created_at=models.DateTimeField(auto_now_add=True)
@@ -352,7 +388,7 @@ class Fertilizer(models.Model):
     ('DOZEN','DOZEN'),
     ]
     measurement_type=models.CharField(max_length=100,null=True,blank=True,choices=units_cho,default="")
-    fk_crop=models.ForeignKey(CropMaster,on_delete=models.CASCADE,null=True,blank=True)
+    fk_crop=models.ForeignKey(CropMapper,on_delete=models.CASCADE,null=True,blank=True)
     created_at=models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -362,7 +398,7 @@ class Fertilizer(models.Model):
 class FruitsPop(models.Model):
     fk_state=models.ForeignKey(StateMaster,on_delete=models.CASCADE,null=True,blank=True)
     fk_language=models.ForeignKey(LanguageSelection,on_delete=models.CASCADE,null=True,blank=True)
-    fk_crops=models.ForeignKey(CropMaster,on_delete=models.CASCADE,null=True,blank=True)
+    fk_crops=models.ForeignKey(CropMapper,on_delete=models.CASCADE,null=True,blank=True)
     stages=models.CharField(max_length=100,null=True,blank=True)
     stage_name=models.CharField(max_length=100,null=True,blank=True)
     stage_number=models.IntegerField(null=True,blank=True)
@@ -400,7 +436,7 @@ class FruitsPop(models.Model):
     end_month = models.IntegerField(null=True,blank=True)
     prefrence_type=models.IntegerField(null=True,blank=True)
     orchidtype=models.CharField(max_length=20,null=True,blank=True,default="")
-    fk_croptype=models.ForeignKey(POPTypes,on_delete=models.CASCADE,null=True,blank=True)
+    fk_croptype=models.ForeignKey(POPMapper,on_delete=models.CASCADE,null=True,blank=True)
     video=models.FileField(upload_to="fruits_video/", blank=True, null=True)
     audio=models.FileField(upload_to="fruits_audio/", blank=True, null=True)
     fk_product=models.ManyToManyField('fponsuppliers.ProductDetails',blank=True)
@@ -411,8 +447,8 @@ class FruitsPop(models.Model):
 
 class FruitsStageCompletion(models.Model):
     fk_fruits = models.ForeignKey(FruitsPop, on_delete=models.CASCADE,null=True,blank=True)
-    fk_croptype=models.ForeignKey(POPTypes,on_delete=models.CASCADE,null=True,blank=True)
-    fk_crops=models.ForeignKey(CropMaster,on_delete=models.CASCADE,null=True,blank=True)
+    fk_croptype=models.ForeignKey(POPMapper,on_delete=models.CASCADE,null=True,blank=True)
+    fk_crops=models.ForeignKey(CropMapper,on_delete=models.CASCADE,null=True,blank=True)
     fk_farmer=models.ForeignKey(FarmerProfile,on_delete=models.CASCADE,null=True)
     fk_farmland=models.ForeignKey(FarmerLandAddress,on_delete=models.CASCADE,null=True)
     start_date = models.DateField(auto_now_add=True)
@@ -432,7 +468,7 @@ class SpicesPop(models.Model):
     stage_name=models.CharField(max_length=100,null=True,blank=True)
     stage_number=models.IntegerField(null=True,blank=True)
     description=models.TextField(null=True,blank=True)
-    fk_crop=models.ForeignKey(CropMaster,on_delete=models.CASCADE,null=True,blank=True)
+    fk_crop=models.ForeignKey(CropMapper,on_delete=models.CASCADE,null=True,blank=True)
     fk_language=models.ForeignKey(LanguageSelection,on_delete=models.CASCADE,null=True,blank=True)
     preference=models.IntegerField(null=True,blank=True)
     video=models.FileField(upload_to="spicespop/", blank=True, null=True)
@@ -449,7 +485,7 @@ class SpicestageCompletion(models.Model):
     stage_number = models.IntegerField(null=True,blank=True)
     fk_farmer = models.ForeignKey(FarmerProfile, on_delete=models.CASCADE,null=True,blank=True)
     fk_farmland=models.ForeignKey(FarmerLandAddress,on_delete=models.CASCADE,null=True)
-    fk_croptype=models.ForeignKey(POPTypes,on_delete=models.CASCADE,null=True,blank=True)
+    fk_croptype=models.ForeignKey(POPMapper,on_delete=models.CASCADE,null=True,blank=True)
     fk_language=models.ForeignKey(LanguageSelection,on_delete=models.CASCADE,null=True,blank=True)
     fk_crop = models.ForeignKey(CropMaster, on_delete=models.CASCADE,null=True,blank=True)
     start_date=models.DateField(null=True, blank=True)
@@ -469,10 +505,10 @@ class SpicestageCompletion(models.Model):
 class SpicesPreferenceCompletion(models.Model):
     fk_farmer = models.ForeignKey(FarmerProfile, on_delete=models.CASCADE)
     fk_farmland=models.ForeignKey(FarmerLandAddress,on_delete=models.CASCADE,null=True)
-    fk_crop = models.ForeignKey(CropMaster, on_delete=models.CASCADE)
+    fk_crop = models.ForeignKey(CropMapper,on_delete=models.CASCADE,null=True,blank=True)
     fk_language=models.ForeignKey(LanguageSelection,on_delete=models.CASCADE,null=True,blank=True)
     fk_spicestage=models.ForeignKey(SpicesPop,on_delete=models.CASCADE,null=True,blank=True)
-    fk_croptype=models.ForeignKey(POPTypes,on_delete=models.CASCADE,null=True,blank=True)
+    fk_croptype=models.ForeignKey(POPMapper,on_delete=models.CASCADE,null=True,blank=True)
     preference_number = models.IntegerField()
     name=models.CharField(max_length=1000,null=True,blank=True)
     start_date = models.DateField(null=True, blank=True)
@@ -490,12 +526,12 @@ class VegetablePop(models.Model):
     stage_name=models.CharField(max_length=100,null=True,blank=True)
     stage_number=models.IntegerField(null=True,blank=True)
     description=models.TextField(null=True,blank=True)
-    fk_crop=models.ForeignKey(CropMaster,on_delete=models.CASCADE,null=True,blank=True)
+    fk_crop=models.ForeignKey(CropMapper,on_delete=models.CASCADE,null=True,blank=True)
     fk_language=models.ForeignKey(LanguageSelection,on_delete=models.CASCADE,null=True,blank=True)
     preference=models.IntegerField(null=True,blank=True)
     video=models.FileField(upload_to="vegetable_pop/", blank=True, null=True)
     audio=models.FileField(upload_to="vegetable_audio/",blank=True, null=True)
-    fk_croptype=models.ForeignKey(POPTypes,on_delete=models.CASCADE,null=True,blank=True)
+    fk_croptype=models.ForeignKey(POPMapper,on_delete=models.CASCADE,null=True,blank=True)
     fk_product=models.ManyToManyField(ProductDetails,blank=True)
     created_at=models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -506,9 +542,9 @@ class VegetableStageCompletion(models.Model):
     stage_number = models.IntegerField(null=True,blank=True)
     fk_farmer = models.ForeignKey(FarmerProfile, on_delete=models.CASCADE,null=True,blank=True)
     fk_farmland=models.ForeignKey(FarmerLandAddress,on_delete=models.CASCADE,null=True)
-    fk_croptype=models.ForeignKey(POPTypes,on_delete=models.CASCADE,null=True,blank=True)
+    fk_croptype=models.ForeignKey(POPMapper,on_delete=models.CASCADE,null=True,blank=True)
     fk_language=models.ForeignKey(LanguageSelection,on_delete=models.CASCADE,null=True,blank=True)
-    fk_crop = models.ForeignKey(CropMaster, on_delete=models.CASCADE,null=True,blank=True)
+    fk_crop = models.ForeignKey(CropMapper,on_delete=models.CASCADE,null=True,blank=True)
     start_date=models.DateField(null=True, blank=True)
     completion_date = models.DateField(null=True, blank=True)
     submit_task=models.FileField(upload_to="task_submit/", blank=True, null=True)
@@ -524,10 +560,10 @@ class VegetableStageCompletion(models.Model):
 class VegetablePreferenceCompletion(models.Model):
     fk_farmer = models.ForeignKey(FarmerProfile, on_delete=models.CASCADE)
     fk_farmland=models.ForeignKey(FarmerLandAddress,on_delete=models.CASCADE,null=True)
-    fk_crop = models.ForeignKey(CropMaster, on_delete=models.CASCADE)
+    fk_crop = models.ForeignKey(CropMapper,on_delete=models.CASCADE,null=True,blank=True)
     fk_language=models.ForeignKey(LanguageSelection,on_delete=models.CASCADE,null=True,blank=True)
     fk_vegetablestage = models.ForeignKey(VegetablePop,on_delete=models.CASCADE,null=True,blank=True)
-    fk_croptype=models.ForeignKey(POPTypes,on_delete=models.CASCADE,null=True,blank=True)
+    fk_croptype=models.ForeignKey(POPMapper,on_delete=models.CASCADE,null=True,blank=True)
     preference_number = models.IntegerField()
     name=models.CharField(max_length=1000,null=True,blank=True)
     start_date = models.DateField(null=True, blank=True)
@@ -561,12 +597,12 @@ class CerealsPop(models.Model):
     stage_name=models.CharField(max_length=100,null=True,blank=True)
     stage_number=models.IntegerField(null=True,blank=True)
     description=models.TextField(null=True,blank=True)
-    fk_crop=models.ForeignKey(CropMaster,on_delete=models.CASCADE,null=True,blank=True)
+    fk_crop=models.ForeignKey(CropMapper,on_delete=models.CASCADE,null=True,blank=True)
     fk_language=models.ForeignKey(LanguageSelection,on_delete=models.CASCADE,null=True,blank=True)
     preference=models.IntegerField(null=True,blank=True)
-    video=models.FileField(upload_to="vegetable_pop/", blank=True, null=True)
-    audio=models.FileField(upload_to="vegetable_audio/",blank=True, null=True)
-    fk_croptype=models.ForeignKey(POPTypes,on_delete=models.CASCADE,null=True,blank=True)
+    video=models.FileField(upload_to="cereal_pop/", blank=True, null=True)
+    audio=models.FileField(upload_to="cereal_audio/",blank=True, null=True)
+    fk_croptype=models.ForeignKey(POPMapper,on_delete=models.CASCADE,null=True,blank=True)
     fk_product=models.ManyToManyField(ProductDetails,blank=True)
     created_at=models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -577,12 +613,12 @@ class CerealStageCompletion(models.Model):
     stage_number = models.IntegerField(null=True,blank=True)
     fk_farmer = models.ForeignKey(FarmerProfile, on_delete=models.CASCADE,null=True,blank=True)
     fk_farmland=models.ForeignKey(FarmerLandAddress,on_delete=models.CASCADE,null=True)
-    fk_croptype=models.ForeignKey(POPTypes,on_delete=models.CASCADE,null=True,blank=True)
+    fk_croptype=models.ForeignKey(POPMapper,on_delete=models.CASCADE,null=True,blank=True)
     fk_language=models.ForeignKey(LanguageSelection,on_delete=models.CASCADE,null=True,blank=True)
-    fk_crop = models.ForeignKey(CropMaster, on_delete=models.CASCADE,null=True,blank=True)
+    fk_crop = models.ForeignKey(CropMapper, on_delete=models.CASCADE,null=True,blank=True)
     start_date=models.DateField(null=True, blank=True)
     completion_date = models.DateField(null=True, blank=True)
-    submit_task=models.FileField(upload_to="task_submit/", blank=True, null=True)
+    submit_task=models.FileField(upload_to="cerealtask_submit/", blank=True, null=True)
     total_days_spent = models.IntegerField(default=0)
     delay_days = models.IntegerField(default=0)
     early_days = models.IntegerField(default=0)
@@ -595,10 +631,10 @@ class CerealStageCompletion(models.Model):
 class CerealPreferenceCompletion(models.Model):
     fk_farmer = models.ForeignKey(FarmerProfile, on_delete=models.CASCADE)
     fk_farmland=models.ForeignKey(FarmerLandAddress,on_delete=models.CASCADE,null=True)
-    fk_crop = models.ForeignKey(CropMaster, on_delete=models.CASCADE)
+    fk_crop=models.ForeignKey(CropMapper,on_delete=models.CASCADE,null=True,blank=True)
     fk_language=models.ForeignKey(LanguageSelection,on_delete=models.CASCADE,null=True,blank=True)
     fk_cerealstage = models.ForeignKey(CerealsPop,on_delete=models.CASCADE,null=True,blank=True)
-    fk_croptype=models.ForeignKey(POPTypes,on_delete=models.CASCADE,null=True,blank=True)
+    fk_croptype=models.ForeignKey(POPMapper,on_delete=models.CASCADE,null=True,blank=True)
     preference_number = models.IntegerField()
     name=models.CharField(max_length=1000,null=True,blank=True)
     start_date = models.DateField(null=True, blank=True)
@@ -622,7 +658,7 @@ class WeatherPopNotification(models.Model):
     fk_weather_condition = models.ManyToManyField(PopWeatherCondition,blank=True)
     fk_croptype=models.ForeignKey(POPTypes,on_delete=models.CASCADE,null=True,blank=True)
     preference_number = models.IntegerField(null=True,blank=True)
-    fk_crops=models.ForeignKey(CropMaster, on_delete=models.CASCADE,null=True,blank=True)
+    fk_crops=models.ForeignKey(CropMapper,on_delete=models.CASCADE,null=True,blank=True)
     notification_text = models.TextField(max_length=1000,null=True, blank=True)
     stages=models.CharField(max_length=1000,null=True, blank=True)
     gif=models.FileField(upload_to="pop_gif/", blank=True, null=True)

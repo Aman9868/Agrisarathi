@@ -53,14 +53,46 @@ class FarmerLandAddressSerializer(serializers.ModelSerializer):
         return [image.crop_image.url for image in crop_images]
 ########################----------------------------Crop Type Serializers------------------###########
 class POPCropTypeSerializer(serializers.ModelSerializer):
+    pop_id = serializers.SerializerMethodField()
+    pop_name = serializers.SerializerMethodField()
+    season = serializers.SerializerMethodField()
+    season_id=serializers.IntegerField(source='season_map.id', read_only=True)
     class Meta:
-        model = POPTypes
-        fields = '__all__'
+        model = POPMapper
+        fields = ['pop_id', 'pop_name', 'season','season_id']
+
+    def get_pop_id(self, obj):
+        return obj.id  
+
+    def get_pop_name(self, obj):
+        user_language = self.context.get('user_language')
+        if user_language == '1':
+            return obj.eng_pop.name if obj.eng_pop else None
+        elif user_language == '2':
+            return obj.hin_pop.name if obj.hin_pop else None
+        return None
+
+    def get_season(self, obj):
+        user_language = self.context.get('user_language')
+        if user_language=='1':
+            return obj.season_map.eng_season.season if obj.season_map else None
+        elif user_language=='2':
+            return obj.season_map.hin_season.season if obj.season_map else None
 ###############################--------------------------Service Providers Serializer--------------------------------##
 class ServiceProviderSerializer(serializers.ModelSerializer):
+    name = serializers.SerializerMethodField()
+
     class Meta:
         model = Service_Provider
-        fields = '__all__'
+        fields = ['id','name', 'service_provider_pic', 'paid_or_free']
+
+    def get_name(self, obj):
+        user_language = self.context.get('user_language')
+        if user_language == "1":  
+            return obj.eng_name
+        elif user_language == "2":  
+            return obj.hin_name
+        return None
 ##############---------------------------------All States Serializer---------------------###########
 class StatesSerializer(serializers.ModelSerializer):
     class Meta:
@@ -204,9 +236,11 @@ class SuggestedCropSerializer(serializers.ModelSerializer):
         return None
 #############################-------------------------Vegetabel Notifciations---------------------################
 class WeatherNotificationSerializer(serializers.ModelSerializer):
+    weather_id=serializers.IntegerField(source='id',read_only=True)
+    crop_id=serializers.CharField(source='fk_crops.id', read_only=True,default=None)
     class Meta:
         model = WeatherPopNotification
-        fields = '__all__'
+        fields = ['weather_id', 'crop_id','stages','gif','preference_number','notification_text']
 class VegetablePrefrencesSerializer(serializers.ModelSerializer):
     class Meta:
         model = VegetablePreferenceCompletion
