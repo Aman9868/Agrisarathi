@@ -26,7 +26,8 @@ urlpatterns = [
     path('InventoryInoutStock',InventoryInoutStock.as_view(),name='InventoryInoutStock'), # instock and oytstock
     path('CheckCustomerisFarmerornot',CheckCustomerisFarmerornot.as_view(),name='CheckCustomerisFarmerornot'),
     path('CheckBuyerisFarmerorNot',CheckBuyerisFarmerorNot.as_view(),name='CheckBuyerisFarmerorNot'),
-    path('GetallCrops',GetallCrops.as_view(),name='GetallCrops'),      
-    path('GetCropVariety',GetCropVariety.as_view(),name='GetCropVariety'),                                                                                                                                                           
+    path('GetallFPOCrops',GetallFPOCrops.as_view(),name='GetallFPOCrops'),      
+    path('GetFPOCropVariety',GetFPOCropVariety.as_view(),name='GetFPOCropVariety'), 
+    path('GetAllProductsFponSupplier',GetAllProductsFponSupplier.as_view(),name='GetAllProductsFponSupplier'),                                                                                                                                                          
                                                                                     
 ]

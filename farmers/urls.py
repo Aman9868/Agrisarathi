@@ -17,6 +17,7 @@ urlpatterns = [
     path('GetallStates',GetallStates.as_view(), name='GetallStates'),
     path('AddDistrict',AddDistrict,name='AddDistrict'),
     path('AddCropVariety',AddCropVariety,name='AddCropVariety'),
+    path('AddState',AddState,name='AddState'),
     path('GetStateWiseDistrict',GetStateWiseDistrict.as_view(), name='GetStateWiseDistrict'),
     path('GetCropVariety',GetCropVariety.as_view(), name='GetCropVariety'),
     path('GetFarmProfileDetails',GetFarmProfileDetails.as_view(), name='GetFarmProfileDetails'),

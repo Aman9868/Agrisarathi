@@ -44,7 +44,7 @@ class FarmerProfileSerializer(serializers.ModelSerializer):
 class FarmerLandAddressSerializer(serializers.ModelSerializer):
     state = serializers.CharField(source='fk_state.state', read_only=True)
     crop_id = serializers.IntegerField(source='fk_crops.id', read_only=True)
-    district = serializers.CharField(source='fk_district.district', read_only=True)
+    district = serializers.SerializerMethodField()
     crop = serializers.SerializerMethodField()
     crop_images=serializers.SerializerMethodField()
     class Meta:
@@ -65,6 +65,14 @@ class FarmerLandAddressSerializer(serializers.ModelSerializer):
         
         print(f"Returning crop name: {crop_name}")
         return crop_name
+    def get_district(self, obj):
+        user_language = obj.fk_farmer.fk_language.id
+        if obj.fk_district:
+            if user_language == 1: 
+                return obj.fk_district.eng_district if obj.fk_district.eng_district else None
+            elif user_language == 2:  
+                return obj.fk_district.hin_district if obj.fk_district.hin_district else None
+        return None
 ########################----------------------------Crop Type Serializers------------------###########
 class POPCropTypeSerializer(serializers.ModelSerializer):
     pop_id = serializers.SerializerMethodField()

@@ -32,12 +32,14 @@ def create_user_token(user, user_type):
 ####################-------------------------------------REST API's Login----------------###############
 class UserLogin(APIView):
     permission_classes = [AllowAny]
+
     def post(self, request, format=None):
         user_type = request.data.get('user_type')
         mobile = request.data.get('mobile')
         password = request.data.get('password')
         ip_address = request.META.get('REMOTE_ADDR')
         print(f"Login attempt with mobile: {mobile}, user_type: {user_type}, password: {password}, IP address: {ip_address}")
+
         try:
             user = CustomUser.objects.filter(mobile=mobile, user_type=user_type).first()
             if user:
@@ -45,12 +47,13 @@ class UserLogin(APIView):
                     tokens = create_user_token(user, user_type)
                     self.update_user_info(user, user_type, ip_address)
                     return Response({
-                        'message': "User Logged in Successfully",
+                        'message': "User logged in successfully",
                         'tokens': tokens
                     }, status=status.HTTP_200_OK)
                 else:
                     return Response({'error': 'Invalid Credentials'}, status=status.HTTP_401_UNAUTHORIZED)
             else:
+                # New user registration and login
                 serializer = LoginSerializer(data=request.data)
                 if serializer.is_valid():
                     related_user = serializer.create_user(serializer.validated_data, user_type)
@@ -64,9 +67,9 @@ class UserLogin(APIView):
                 return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
         except Exception as e:
-                error_message = str(e)
-                trace = traceback.format_exc()
-                return Response(
+            error_message = str(e)
+            trace = traceback.format_exc()
+            return Response(
                 {
                     "status": "error",
                     "message": "An unexpected error occurred",
@@ -78,7 +81,8 @@ class UserLogin(APIView):
 
     def update_user_info(self, user, user_type, ip_address, is_new=False):
         if user_type == 'fpo':
-            fpo = get_object_or_404(FPO, user=user)
+            fpo = FPO.objects.get(user=user)
+            print(f"FPO is :{fpo}")
             fpo.ip_address = ip_address
             if is_new:
                 fpo.created_by = user
@@ -87,14 +91,15 @@ class UserLogin(APIView):
             fpo.last_updated_at = timezone.now()
             fpo.save()
         elif user_type == 'supplier':
-            supplier = get_object_or_404(Supplier, user=user)
+            supplier =Supplier.objects.get(user=user)
+            print(f"Supplier is :{supplier}")
             supplier.ip_address = ip_address
             if is_new:
                 supplier.created_by = user
                 supplier.created_at = timezone.now()
             supplier.last_updated_by = user
             supplier.last_updated_at = timezone.now()
-            supplier.save()    
+            supplier.save()   
 #############----------------------Logout---------------------##################
 class UserLogout(APIView):
     def post(self, request):
@@ -270,44 +275,34 @@ class UpdateProfilePicture(APIView):
         
 ###################------------------------------------Reset Password-----------------###############
 class ResetPasssword(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
     def put(self, request, format=None):
-        user = request.user
-        print(f"User is {user.user_type}")
+        #user = request.user
+        #print(f"User is {user.user_type}")
         try:
             mobile = request.data.get('mobile')
             new_password = request.data.get('new_password')
             
             if not mobile or not new_password:
                 return Response({'error': 'Please provide mobile and new_password'}, status=status.HTTP_400_BAD_REQUEST)
-            
-            if user.user_type == 'fpo':
-                try:
-                    fpo = FPO.objects.filter(user=user, mobile=mobile).first()
-                    if fpo:
+            try:
+                user=CustomUser.objects.get(mobile=mobile,user_type="FPO")
+                print(f"User is :{user}")
+                print(f"USer type is :{user.user_type}")
+                fpo = FPO.objects.get(mobile=user.mobile)
+                print(f"Fpo is:{fpo}")
+                if fpo:
                         fpo.password = make_password(new_password)
                         fpo.save()
                         user.set_password(new_password)
                         user.save()
                         return Response({'message': 'FPO Password reset successfully'}, status=status.HTTP_200_OK)
-                    else:
-                        return Response({'error': 'FPO not found with given mobile number'}, status=status.HTTP_404_NOT_FOUND)
-                except FPO.DoesNotExist:
+                else:
                     return Response({'error': 'FPO not found with given mobile number'}, status=status.HTTP_404_NOT_FOUND)
+            except FPO.DoesNotExist:
+                return Response({'error': 'FPO not found with given mobile number'}, status=status.HTTP_404_NOT_FOUND)
             
-            elif user.user_type == 'supplier':
-                try:
-                    supplier = Supplier.objects.filter(user=user, mobile=mobile).first()
-                    if supplier:
-                        supplier.password = make_password(new_password)
-                        supplier.save()
-                        user.set_password(new_password)
-                        user.save()
-                        return Response({'message': 'Supplier Password reset successfully'}, status=status.HTTP_200_OK)
-                    else:
-                        return Response({'error': 'Supplier not found with given mobile number'}, status=status.HTTP_404_NOT_FOUND)
-                except Supplier.DoesNotExist:
-                    return Response({'error': 'Supplier not found with given mobile number'}, status=status.HTTP_404_NOT_FOUND)
+        
             
         except Exception as e:
             trace = traceback.format_exc()
@@ -1146,6 +1141,40 @@ class ADDProductDetailsCSV(APIView):
                 },
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+#####################----------------------GEt all Productby FPO and Suppliers------------------###############
+class GetAllProductsFponSupplier(APIView):
+    permission_classes = [IsAuthenticated]
+    def get(self, request, *args, **kwargs):
+        try:
+            user = request.user
+            print(f"User is :{user.user_type}")
+            if user.user_type == 'fpo':
+                try:
+                    fpo_profile = FPO.objects.get(user=user)
+                    print(f"Fpo Profile : {fpo_profile}")
+                except FPO.DoesNotExist:
+                        return Response({'error': 'FPO details not found'}, status=status.HTTP_404_NOT_FOUND)
+                products = InventoryDetails.objects.filter(fk_fpo=fpo_profile)
+                if not products.exists():
+                    return Response({'message': 'No products found for the specified filter type'}, status=status.HTTP_404_NOT_FOUND)
+                data=FPOProductDetailSerializer(products,many=True)
+                return Response({'status': 'success', 'products': data.data}, status=status.HTTP_200_OK)
+            elif user.user_type == 'supplier':
+                try:
+                    supplier_info = Supplier.objects.get(user=user)
+                    print(f"Supplier Info :{supplier_info}")
+                except Supplier.DoesNotExist:
+                    return Response({'error': 'Supplier details not found'}, status=status.HTTP_404_NOT_FOUND)
+                products = InventoryDetails.objects.filter(fk_supplier=supplier_info)
+                if not products.exists():
+                    return Response({'message': 'No products found for the specified filter type'}, status=status.HTTP_404_NOT_FOUND)
+                data=SupplierProductDetailSerializer(products,many=True)
+                return Response({'status': 'success', 'products': data.data}, status=status.HTTP_200_OK)
+            else:
+                return Response({'message': 'User type not recognized'}, status=status.HTTP_400_BAD_REQUEST)
+
+        except Exception as e:
+            return Response({'message': 'An error occurred', 'error': traceback.format_exc()}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 #########################-------------------GET ALL Purchases Info by FPO/Suppliers---------------------#################
 class PurchaseInfo(APIView):
     permission_classes=[IsAuthenticated]
@@ -1497,8 +1526,14 @@ class AddGetSales(APIView):
                 except FPO.DoesNotExist:
                     return Response({'error': 'FPO details not found'}, status=status.HTTP_404_NOT_FOUND)
                 sales=SalesRecordItem.objects.filter(fk_fpo=fpo_profile).order_by('sales_date')
-                sales_serializer=FPOSalesRecordItemSerializer(data=sales,many=True)
-                return Response(sales_serializer.data, status=200)
+                print(f"SaLES Data: {sales}")
+                paginator=GetallInventoryPagination()
+                result_page = paginator.paginate_queryset(sales, request)
+                sales_serializer=FPOSalesRecordItemSerializer(result_page,many=True)
+                return paginator.get_paginated_response({
+                        'status': 'success',
+                        'inventory': sales_serializer.data,
+                    })
             elif user.user_type=='supplier':
                 try:
                     supplier_profile = Supplier.objects.get(user=user)
@@ -1506,8 +1541,13 @@ class AddGetSales(APIView):
                 except Supplier.DoesNotExist:
                     return Response({'error': 'Supplier details not found'}, status=status.HTTP_404_NOT_FOUND)
                 sales=SalesRecordItem.objects.filter(fk_supplier=supplier_profile).order_by('sales_date')
-                sales_serializer=FPOSalesRecordItemSerializer(data=sales,many=True)
-                return Response(sales_serializer.data, status=200)
+                paginator=GetallInventoryPagination()
+                result_page = paginator.paginate_queryset(sales, request)
+                sales_serializer=SupplierSalesRecordItemSerializer(result_page,many=True)
+                return paginator.get_paginated_response({
+                        'status': 'success',
+                        'inventory': sales_serializer.data,
+                    })
             else:
                 return Response({'error': 'User type not recognized'}, status=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
@@ -1761,20 +1801,19 @@ class CheckBuyerisFarmerorNot(APIView):
                 return Response({"status": "error","message": "An unexpected error occurred",
                                  "error_message": error_message,"traceback": trace},status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 ###############-------------------------------Get ALL CROPS----------------############
-class GetallCrops(APIView):
+class GetallFPOCrops(APIView):
     permission_classes=[IsAuthenticated]
     def get(self,request):
         user=request.user
         print(f"User is {user.user_type}")
         try:
-            user_language=request.query_params.get('user_language','1')
             if user.user_type=="fpo":
 
                 try:
-                    data=CropMaster.objects.filter(fk_language_id=user_language)
-                except CropMaster.DoesNotExist:
+                    data = CropMapper.objects.filter(eng_crop__isnull=False, is_deleted=False).select_related('eng_crop')
+                except CropMapper.DoesNotExist:
                     return Response({'status': 'error', 'msg': 'No such Data Found'}, status=status.HTTP_404_NOT_FOUND)
-                states_serializer=CropMasterSerializer(data,many=True)
+                states_serializer=CropMapperSerializer(data,many=True)
                 print(f"States Data: {states_serializer.data}")
                 return Response({'success': 'ok','data': states_serializer.data}, status=status.HTTP_200_OK)
             else:
@@ -1792,7 +1831,7 @@ class GetallCrops(APIView):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 #############################################---------------------------Get Crop Variety Details----------------################
-class GetCropVariety(APIView):
+class GetFPOCropVariety(APIView):
     permission_classes=[IsAuthenticated]
     def get(self, request):
         user=request.user
@@ -1800,9 +1839,10 @@ class GetCropVariety(APIView):
         try:
             if user.user_type=="fpo":
                 crop_id=request.query_params.get('crop_id')
-                user_language=request.query_params.get('user_language','1')
-                variety=CropVariety.objects.filter(fk_crops_id=crop_id,fk_language_id=user_language)
-                return Response({'message':'success','data':list(variety.values())}, status=200)
+                variety=CropVariety.objects.filter(fk_crops_id=crop_id,eng_name__isnull=False)
+                print(f"Variety is '{variety}")
+                vareiety_data=CropVarietySerializer(variety,many=True)
+                return Response({'success': 'ok','data': vareiety_data.data}, status=status.HTTP_200_OK)
             else:
                 return Response({'message':'Only Farmer can access this data'}, status=403)
         except Exception as e:

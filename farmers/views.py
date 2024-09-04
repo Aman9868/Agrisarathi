@@ -1394,7 +1394,6 @@ class GetSingleDiagnosisReport(APIView):
         user=request.user
         print(f"User is {user}")
         try:
-            user_language = request.query_params.get('user_language')
             diag_id = request.query_params.get('diag_id')
             if not diag_id:
                 return Response({'status': 'error','message': 'Diagnosis report ID is required'}, status=status.HTTP_400_BAD_REQUEST)
@@ -2060,18 +2059,15 @@ class CropSuggestion(APIView):
     permission_classes = [IsAuthenticated]  
     def post(self, request,format=None):
         user=request.user
-        user_language = request.data.get('user_language')
-        if not user_language:
-            return Response({'message':'User language is required'}, status=status.HTTP_400_BAD_REQUEST)
         current_month = timezone.now().month
         try:
             if user.user_type == "farmer":
                 try:
                     farmer = FarmerProfile.objects.get(user=user)
+                    user_language = farmer.fk_language.id
                 except FarmerProfile.DoesNotExist:
                     return Response({'message': 'Farmer Not Found'}, status=status.HTTP_404_NOT_FOUND)
                 suggested_crops = SuggestedCrop.objects.filter(
-                fk_language_id=user_language,
                 start_month__lte=current_month,
                 end_month__gte=current_month
                 ).exclude(fk_crop__isnull=True)
@@ -2081,10 +2077,14 @@ class CropSuggestion(APIView):
                 for crop in suggested_crops:
                     crop_info = {
                         'crop_id': crop.fk_crop.id if crop.fk_crop else None,
-                        'crop_name': crop.fk_crop.crop_name if crop.fk_crop else None,
+                        'crop_name': None,
                         'crop_image': None
                                 }
                     if crop.fk_crop:
+                        if user_language == 1:  
+                            crop_info['crop_name'] = crop.fk_crop.eng_crop.crop_name if crop.fk_crop.eng_crop else None
+                        elif user_language == 2:  
+                            crop_info['crop_name'] = crop.fk_crop.hin_crop.crop_name if crop.fk_crop.hin_crop else None
                         crop_images = CropImages.objects.filter(fk_cropmaster=crop.fk_crop)
                         if crop_images.exists():
                             crop_info['crop_image'] = crop_images.first().crop_image.url
@@ -2105,14 +2105,18 @@ class CropSuggestion(APIView):
         user=request.user
         print(f"User is {user.user_type}")
         crop_id=request.query_params.get('crop_id')
-        user_language=request.query_params.get('user_language')
-        if not crop_id or not user_language:
-            return Response({'message':'Crop id and user language are required'}, status=status.HTTP_400_BAD_REQUEST)
+        if not crop_id:
+            return Response({'message':'Crop id is required'}, status=status.HTTP_400_BAD_REQUEST)
         try:
             if user.user_type=="farmer":
                 try:
-                    crop = CropMaster.objects.get(id=crop_id)
-                except CropMaster.DoesNotExist:
+                    farmer = FarmerProfile.objects.get(user=user)
+                    user_language = farmer.fk_language.id
+                except FarmerProfile.DoesNotExist:
+                    return Response({'message': 'Farmer Not Found'}, status=status.HTTP_404_NOT_FOUND)
+                try:
+                    crop = CropMapper.objects.get(id=crop_id)
+                except CropMapper.DoesNotExist:
                     return Response({'error': 'Crop not found'},status=status.HTTP_404_NOT_FOUND)
                 suggested_crop = SuggestedCrop.objects.filter(fk_crop=crop, fk_language_id=user_language).first()
                 if not suggested_crop:

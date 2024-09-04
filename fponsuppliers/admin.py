@@ -64,7 +64,7 @@ class CustomerDetailsAdmin(admin.ModelAdmin):
 ###########################--------------Inventory & Packaging-------------------------------###########################
 @admin.register(InventoryDetails)
 class InventoryDetailsAdmin(admin.ModelAdmin):
-    list_display = ('id', 'get_produtcname','stock','location','created_at','updated_at')
+    list_display = ('id', 'get_produtcname','stock','location','created_at','updated_at','fk_product')
     def get_produtcname(self, obj):
         return obj.fk_product.productName if obj.fk_product else None
     get_produtcname.short_description = 'Product Name'

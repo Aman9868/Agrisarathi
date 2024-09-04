@@ -2,7 +2,7 @@
 from rest_framework import serializers
 from rest_framework_simplejwt.tokens import RefreshToken,TokenError
 from .models import *
-from farmers.models import FarmerProfile ,CropMaster
+from farmers.models import FarmerProfile,CropMapper,CropVariety
 from .managers import *
 from rest_framework.pagination import LimitOffsetPagination
 from rest_framework.pagination import PageNumberPagination
@@ -250,9 +250,7 @@ class SupplierProductFilterDetailsSerializer(serializers.ModelSerializer):
             'quantity', 'composition', 'selling_status', 'Category', 
             'supplier_id', 'prices'
         ]
-class CropMasterSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = CropMaster
+
     def get_prices(self, obj):
         supplier_id = self.context['supplier_id']
         prices = obj.productprices_set.filter(fk_supplier_id=supplier_id)  
@@ -307,12 +305,15 @@ class FPOProductDetailSerializer(serializers.ModelSerializer):
     stock_status=serializers.SerializerMethodField()
     product_id = serializers.IntegerField(source='fk_product.id')
     productName = serializers.CharField(source='fk_product.productName')
+    supplier_name = serializers.CharField(source='fk_fposupplier.party_name')
+    product_price = serializers.FloatField(source='fk_price.unit_price')
     Category = serializers.CharField(source='fk_product.Category')
     product_type = serializers.CharField(source='fk_product.fk_productype.product_type')
     stock_quantity = serializers.IntegerField(source='stock')
     class Meta:
         model=InventoryDetails
-        fields=['inventory_id','product_id','productName','Category','product_type','supplier_id','stock_status','stock_quantity']
+        fields=['inventory_id','product_id','productName','Category','product_type','supplier_id','stock_status','stock_quantity',
+                'supplier_name','product_price']
     def get_stock_status(self, obj):
         return obj.stock_status() if obj else None
     def get_supplier_id(self, obj):
@@ -324,12 +325,15 @@ class SupplierProductDetailSerializer(serializers.ModelSerializer):
     stock_status=serializers.SerializerMethodField()
     product_id = serializers.IntegerField(source='fk_product.id')
     productName = serializers.CharField(source='fk_product.productName')
+    supplier_name = serializers.CharField(source='fk_inputsupplier.party_name', allow_null=True)
+    product_price = serializers.CharField(source='fk_price.unit_price', allow_null=True)
     Category = serializers.CharField(source='fk_product.Category')
     product_type = serializers.CharField(source='fk_product.fk_productype.product_type')
     stock_quantity = serializers.IntegerField(source='stock')
     class Meta:
         model=InventoryDetails
-        fields=['inventory_id','product_id','productName','Category','product_type','supplier_id','stock_status','stock_quantity']
+        fields=['inventory_id','product_id','productName','Category','product_type','supplier_id','stock_status','stock_quantity',
+                'supplier_name','product_price']
     def get_stock_status(self, obj):
         return obj.stock_status() if obj else None
     def get_supplier_id(self, obj):
@@ -423,7 +427,17 @@ class GetallSalesPagination(PageNumberPagination):
     page_size_query_param = 'page_size'
     max_page_size = 100 
 
-class CropMasterSerializer(serializers.ModelSerializer):
+class CropMapperSerializer(serializers.ModelSerializer):
+    crop_id = serializers.IntegerField(source='id')
+    name = serializers.CharField(source='eng_crop.crop_name', read_only=True)
     class Meta:
-        model = CropMaster
-        fields='__all__'
+        model = CropMapper
+        fields = ['crop_id', 'name']
+
+
+class CropVarietySerializer(serializers.ModelSerializer):
+    variety_id = serializers.IntegerField(source='id')
+    name = serializers.CharField(source='eng_name', read_only=True)
+    class Meta:
+        model = CropVariety
+        fields = ['variety_id', 'name']
