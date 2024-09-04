@@ -45,7 +45,7 @@ class FarmerLogin(APIView):
         if login_type == 'mobile' and not mobile:
             return Response({'error': 'Mobile is required for mobile login'}, status=status.HTTP_400_BAD_REQUEST)
 
-        otp = random.randint(1000, 9999)
+        otp = random.randint(100000, 999999)
         print(f"Login attempt with {login_type}: {mobile or email}, user_type: {user_type}, IP address: {ip_address}")
         print(f"\nOtp is {otp}")
 
@@ -114,6 +114,7 @@ class VerifyOTP(APIView):
         email = request.data.get('email', '')
         otp = request.data.get('otp')
         user_type = request.data.get('user_type')
+        user_language = request.data.get('user_language')
 
         if not login_type or not otp or not user_type:
             return Response({'error': 'login_type, identifier, user_type, and otp are required'}, status=status.HTTP_400_BAD_REQUEST)
@@ -146,26 +147,32 @@ class VerifyOTP(APIView):
                     'email': email if login_type == 'email' else None,
                     'mobile': mobile if login_type == 'mobile' else None,
                     'user_type': user_type,
+                    'user_language': user_language, 
                 }
                 print(f"User data:{user_data}")
                 serializer = FarmerRegistrationSerializer(data=user_data, user_type=user_type)
                 if serializer.is_valid():
                     user = serializer.save()
                     is_existing_user=False
+                    is_land=False
                     print(f"Serializer validated data: {serializer.validated_data}")
                 else:
                     print(f"Serializer errors: {serializer.errors}")
                     return Response({'error': 'Failed to create user'}, status=status.HTTP_400_BAD_REQUEST)
             else:
                 is_existing_user = FarmerProfile.objects.filter(user=user).exists()
-                print(f"User in Record :{is_existing_user}")
+                farmer=FarmerProfile.objects.get(user=user)
+                print(f"Farmer Record :{farmer}")
+                
 
             if user is None:
                 return Response({'error': 'User not found or created'}, status=status.HTTP_400_BAD_REQUEST)
 
             with transaction.atomic():
-                farmer_profile, created = FarmerProfile.objects.get_or_create(user=user)
+                farmer_profile, created = FarmerProfile.objects.get_or_create(user=user,fk_language_id=user_language)
                 print(f"Farmer Record Created :{farmer_profile}")
+                is_land = FarmerLandAddress.objects.filter(fk_farmer=farmer_profile).exists()
+                print(f"Land in Record :{is_land}")
 
             tokens = create_farmer_token(user, user_type)
             print(f"Tokens: {tokens}")
@@ -177,8 +184,9 @@ class VerifyOTP(APIView):
             return Response({
                 'message': 'OTP verified successfully',
                 'is_authenticated': True,
+                'is_land':is_land,
                 'is_existing_user': is_existing_user,
-                'tokens': tokens,
+                'tokens': tokens
             }, status=status.HTTP_200_OK)
 
         except Exception as e:
@@ -331,14 +339,17 @@ class GetallStates(APIView):
         user=request.user
         print(f"User is {user.user_type}")
         try:
-            user_language=request.query_params.get('user_language')
             if user.user_type=="farmer":
-
                 try:
-                    data=StateMaster.objects.filter(fk_language_id=user_language)
-                except StateMaster.DoesNotExist:
-                    return Response({'status': 'error', 'msg': 'No such Data Found'}, status=status.HTTP_404_NOT_FOUND)
-                states_serializer=StatesSerializer(data,many=True)
+                    farmer_profile=FarmerProfile.objects.get(user=user)
+                    print(f"Farmer is :{farmer_profile.user}")
+                    user_language=farmer_profile.fk_language.id
+                    print(f"Language is :{user_language}")
+                except FarmerProfile.DoesNotExist:
+                    return Response({'status': 'error', 'msg': 'No Farmer Data Found'}, status=status.HTTP_404_NOT_FOUND)
+                
+                states = StateMaster.objects.filter(is_deleted=False)
+                states_serializer = StatesSerializer(states, many=True, context={'user_language': user_language})
                 print(f"States Data: {states_serializer.data}")
                 return Response({'success': 'ok','data': states_serializer.data}, status=status.HTTP_200_OK)
             else:
@@ -395,10 +406,18 @@ class GetCropVariety(APIView):
         print(f"User is '{user.user_type}")
         try:
             if user.user_type=="farmer":
+                try:
+                    farmer_profile=FarmerProfile.objects.get(user=user)
+                    print(f"Farmer profile is {farmer_profile}")
+                    user_language=farmer_profile.fk_language.id
+                    print(f"Language is :{user_language}")
+                except FarmerProfile.DoesNotExist:
+                    return Response({'status': 'error', 'msg': 'No Farmer Data Found'}, status=status.HTTP_404_NOT_FOUND)
                 crop_id=request.query_params.get('crop_id')
-                user_language=request.query_params.get('user_language')
-                variety=CropVariety.objects.filter(fk_crops_id=crop_id,fk_language_id=user_language)
-                return Response({'message':'success','data':list(variety.values())}, status=200)
+                varieties = CropVariety.objects.filter(fk_crops_id=crop_id)
+                print(f"Varieties are {varieties}")
+                serializer = CropVarietySerializer(varieties, many=True, context={'user_language': user_language})
+                return Response({'message': 'success', 'data': serializer.data}, status=200)
             else:
                 return Response({'message':'Only Farmer can access this data'}, status=403)
         except Exception as e:
@@ -411,13 +430,20 @@ class GetStateWiseDistrict(APIView):
         print(f"User is {user.user_type}")
         try:
             state = request.query_params.get('state')
-            user_language = request.query_params.get('user_language')
 
-            if not state or not user_language:
+            if not state:
                 return Response({'error': 'State and user_language are required fields.'}, status=status.HTTP_400_BAD_REQUEST)
             if user.user_type=="farmer":
-                districts = DistrictMaster.objects.filter(fk_state_id=state, fk_language_id=user_language)
-                serializer = DistrictMasterSerializer(districts, many=True)
+                try:
+                    farmer_profile=FarmerProfile.objects.get(user=user)
+                    print(f"Farmer profile is {farmer_profile}")
+                    user_language=farmer_profile.fk_language.id
+                    print(f"Language is :{user_language}")
+                except FarmerProfile.DoesNotExist:
+                    return Response({'status': 'error', 'msg': 'No Farmer Data Found'}, status=status.HTTP_404_NOT_FOUND)
+                
+                districts = DistrictMaster.objects.filter(fk_state_id=state,is_deleted=False )
+                serializer = DistrictMasterSerializer(districts, many=True,context={'user_language': user_language})
                 return Response({'success': 'Ok', 'data': serializer.data}, status=status.HTTP_200_OK)
             else:
                 return Response({'error': 'User type is not farmer'}, status=status.HTTP_400_BAD_REQUEST)
@@ -471,19 +497,24 @@ class GetInitialScreenCrops(APIView):
     
     def get(self, request):
         user = request.user
-        user_language = request.query_params.get('user_language', '1')  # Default to '1' if not provided
-        
         if user.user_type != "farmer":
             return Response({"error": "User is not a farmer"}, status=status.HTTP_403_FORBIDDEN)
         
         try:
+            try:
+                farmer_profile=FarmerProfile.objects.get(user=user)
+                print(f"Farmer profile is {farmer_profile}")
+                user_language=farmer_profile.fk_language.id
+                print(f"Language is :{user_language}")
+            except FarmerProfile.DoesNotExist:
+                return Response({'status': 'error', 'msg': 'No Farmer Data Found'}, status=status.HTTP_404_NOT_FOUND)
             crop_data_by_type_and_season = {}
             crop_mappers = CropMapper.objects.filter(is_deleted=False)
             
             for crop_mapper in crop_mappers:
-                if user_language == '1':
+                if user_language == 1:
                     crop = crop_mapper.eng_crop
-                elif user_language == '2':
+                elif user_language == 2:
                     crop = crop_mapper.hin_crop
                 else:
                     return Response({"error": "Invalid language parameter"}, status=status.HTTP_400_BAD_REQUEST)
@@ -492,8 +523,8 @@ class GetInitialScreenCrops(APIView):
                     pop_mapper = crop_mapper.pop_map
                     season_mapper = pop_mapper.season_map if pop_mapper else None
                     
-                    crop_type = pop_mapper.eng_pop if user_language == '1' else pop_mapper.hin_pop
-                    season = season_mapper.eng_season if user_language == '1' else season_mapper.hin_season
+                    crop_type = pop_mapper.eng_pop if user_language == 1 else pop_mapper.hin_pop
+                    season = season_mapper.eng_season if user_language == 1 else season_mapper.hin_season
                     crop_image_obj = CropImages.objects.filter(fk_cropmaster=crop_mapper).first()
                     crop_image_url = crop_image_obj.crop_image.url if crop_image_obj and crop_image_obj.crop_image else None
                     
@@ -555,21 +586,27 @@ class GetDiseaseVideos(APIView):
 #####################################--------------------Get POP Type-------------------------#############
 class CropTypes(APIView):
     permission_classes = [IsAuthenticated]
+
     def get(self, request):
+        user = request.user
         try:
-            user_language = request.query_params.get('user_language')
-            if not user_language:
-                return Response({'status': 'error', 'message': 'Missing required field: user_language'}, status=status.HTTP_400_BAD_REQUEST)
-
-            print(f"User Language is: {user_language}")
+            if user.user_type != "farmer":
+                return Response({'status': 'error', 'message': 'Only farmers can access this data'}, status=status.HTTP_403_FORBIDDEN)
+            
+            try:
+                farmer_profile = FarmerProfile.objects.get(user=user)
+                user_language = farmer_profile.fk_language.id
+            except FarmerProfile.DoesNotExist:
+                return Response({'status': 'error', 'msg': 'No Farmer Data Found'}, status=status.HTTP_404_NOT_FOUND)
+            
             pop_mappers = POPMapper.objects.filter(is_deleted=False)
-            data = POPCropTypeSerializer(pop_mappers, many=True, context={'user_language': user_language})
-            print(f"Data to be returned: {data}")
-
-            if not data:
+            serializer = POPCropTypeSerializer(pop_mappers, many=True, context={'user_language': user_language})
+            print(f"Data:{serializer.data}")
+            
+            if not serializer.data:
                 return Response({'status': 'error', 'message': 'No data found'}, status=status.HTTP_404_NOT_FOUND)
-                
-            return Response({'message': 'success', 'data': data.data},status=status.HTTP_200_OK)
+            
+            return Response({'message': 'success', 'data': serializer.data}, status=status.HTTP_200_OK)
         
         except Exception as e:
             error_message = str(e)
@@ -1177,131 +1214,141 @@ class DetectDiseaseAPIView(APIView):
     def post(self, request, *args, **kwargs):
         user = request.user
         print(f"User is {user.user_type}")
+
         try:
             service_provider_id = request.data.get('service_provider_id')
             crop_id = request.data.get('crop_id')
             image = request.FILES.get('image')
-            user_language = request.data.get('user_language')
             filter_type = request.data.get('filter_type')
             farmer_land_id = request.data.get('farmer_land_id')
-            fk_farm_id = None
-            state = None
-            district = None
 
-            if user.user_type == "farmer":
-                try:
-                    farmer_profile = FarmerProfile.objects.get(user=user,fk_language_id=user_language)
-                    farmer_profile.add_coins(10)
-                    farmer_profile.save()
-                except FarmerProfile.DoesNotExist:
-                    return Response({'error': 'User is not a farmer'}, status=status.HTTP_403_FORBIDDEN)
-
-                if farmer_land_id:
-                    try:
-                        farm = FarmerLandAddress.objects.get(id=farmer_land_id, fk_farmer=farmer_profile, fk_crops__id=crop_id)
-                        fk_farm_id = farm.id
-                        state = farm.fk_state.state if farm.fk_state else None
-                        district = farm.fk_district.district if farm.fk_district else None
-                    except FarmerLandAddress.DoesNotExist:
-                        return Response({'error': 'Invalid farmer land ID'}, status=status.HTTP_404_NOT_FOUND)
-
-                related_crop_ids = {
-                    '1': ['1', '1'],
-                    '2': ['2', '2'],
-                }
-
-                if filter_type.lower() in ['leaf', 'leaves']:
-                    if crop_id in related_crop_ids['1']:
-                        model_name = "Amanaccessassist/finetuner-potato-leaf"
-                    elif crop_id in related_crop_ids['2']:
-                        model_name = "Amanaccessassist/finetune-mango-leaf"
-                    else:
-                        return Response({'error': 'Invalid crop ID'}, status=status.HTTP_400_BAD_REQUEST)
-                elif filter_type.lower() == 'finished product':
-                    if crop_id in related_crop_ids['1']:
-                        model_name = "Amanaccessassist/finetuned-potato-chips"
-                    else:
-                        return Response({'error': 'Invalid crop ID'}, status=status.HTTP_400_BAD_REQUEST)
-                elif filter_type.lower() == 'crop':
-                    if crop_id in related_crop_ids['1']:
-                        model_name = "Amanaccessassist/finetuned-potato-food"
-                    elif crop_id in related_crop_ids['2']:
-                        model_name = "Amanaccessassist/finetuned-mango-food"
-                    else:
-                        return Response({'error': 'Invalid crop ID'}, status=status.HTTP_400_BAD_REQUEST)
-                else:
-                    return Response({'error': 'Invalid filter type'}, status=status.HTTP_400_BAD_REQUEST)
-
-                pil_image = Image.open(image)
-                disease_name, disease_images = process_image(pil_image, model_name)
-
-                if user_language == '1':
-                    obj = DiseaseMaster.objects.filter(name=disease_name, fk_crops__id__in=related_crop_ids[crop_id], fk_language_id=user_language).first()
-                else:
-                    try:
-                        language = LanguageSelection.objects.get(id=user_language)
-                        disease_translations = DiseaseTranslation.objects.filter(
-                            fk_disease__name=disease_name,
-                            fk_language=language,
-                        )
-                        if disease_translations.exists():
-                            disease_translation = disease_translations.first()
-                            disease_name = disease_translation.translation
-                            obj = DiseaseMaster.objects.filter(name=disease_name, fk_crops__id__in=related_crop_ids[crop_id]).first()
-                        else:
-                            return Response({'error': f'Disease translation not found for language {user_language}'}, status=status.HTTP_404_NOT_FOUND)
-                    except LanguageSelection.DoesNotExist:
-                        return Response({'error': 'Invalid language ID'}, status=status.HTTP_400_BAD_REQUEST)
-
-                if not obj:
-                    return Response({'error': 'Disease not found in database'}, status=status.HTTP_404_NOT_FOUND)
-
-                disease_images_queryset = Disease_Images_Master.objects.filter(fk_disease__id=obj.id)
-                disease_images_serialized = DiseaseImagesMasterSerializer(disease_images_queryset, many=True).data
-
-                upload_disease = Upload_Disease.objects.create(
-                    fk_provider_id=service_provider_id,
-                    fk_crop_id=crop_id,
-                    fk_disease=obj,
-                    filter_type=filter_type,
-                    uploaded_image=image,
-                    fk_user=farmer_profile,
-                    created_dt=datetime.now(),
-                    fk_farmer_land_id=fk_farm_id,
-                    state=state,
-                    district=district,
-                    fk_language_id=user_language
-                )
-
-                disease_images_serialized.insert(0, {'disease_file': upload_disease.uploaded_image.url if upload_disease.uploaded_image else None})
-
-                product_disease_queryset = DiseaseProductInfo.objects.filter(
-                                        fk_disease__name=disease_name, 
-                                        fk_crop__id__in=related_crop_ids[crop_id]
-                                            ).distinct().prefetch_related('fk_product')
-
-                product_disease_serialized = DiseaseProductInfoSerializer(product_disease_queryset, many=True).data
-
-                disease_results = {
-                    'disease_id': obj.id,
-                    'disease': obj.name,
-                    'crop_id': int(crop_id),
-                    'symptom': obj.symptom,
-                    'treatmentbefore': obj.treatmentbefore,
-                    'treatmentfield': obj.treatmentfield,
-                    'treatment': obj.treatment,
-                    'message': obj.message,
-                    'suggestiveproduct': obj.suggestiveproduct,
-                    'images': disease_images_serialized,
-                    'base_path': '/media/disease'
-                }
-
-                return Response({
-                    'disease_results': disease_results,
-                    'product_disease': product_disease_serialized
-                }, status=status.HTTP_200_OK)
-            else:
+            if user.user_type != "farmer":
                 return Response({'error': 'Invalid user type'}, status=status.HTTP_403_FORBIDDEN)
+
+            try:
+                farmer_profile = FarmerProfile.objects.get(user=user)
+                user_language=farmer_profile.fk_language.id
+                print(f"User language IS: {user_language}")
+                farmer_profile.add_coins(10)
+                farmer_profile.save()
+            except FarmerProfile.DoesNotExist:
+                return Response({'error': 'No Farmer Data Found'}, status=status.HTTP_404_NOT_FOUND)
+
+            fk_farm_id, state, district = None, None, None
+            if farmer_land_id:
+                try:
+                    farm = FarmerLandAddress.objects.get(id=farmer_land_id, fk_farmer=farmer_profile, fk_crops__id=crop_id)
+                    print(f"Farme Data is :{farm}")
+                    fk_farm_id = farm.id
+                    if user_language == 1:  
+                        state = farm.fk_state.eng_state if farm.fk_state else None
+                        print(f"State is :{state}")
+                        district = farm.fk_district.eng_district if farm.fk_district else None
+                        print(f"District is :{district}")
+                    elif user_language == 2:  
+                        state = farm.fk_state.hin_state if farm.fk_state else None
+                        print(f"State is :{state}")
+                        district = farm.fk_district.hin_district if farm.fk_district else None
+                        print(f"District is :{district}")
+                    else:
+                        return Response({'error': 'Invalid user language'}, status=status.HTTP_400_BAD_REQUEST)
+
+                except FarmerLandAddress.DoesNotExist:
+                    return Response({'error': 'Invalid farmer land ID'}, status=status.HTTP_404_NOT_FOUND)
+
+            # Determine model name based on crop ID and filter type
+            related_crop_ids = {
+                '1': ['1', '1'],
+                '2': ['2', '2'],
+            }
+
+            model_name_map = {
+                'leaf': {
+                    '1': "Amanaccessassist/finetuner-potato-leaf",
+                    '2': "Amanaccessassist/finetune-mango-leaf",
+                },
+                'finished product': {
+                    '1': "Amanaccessassist/finetuned-potato-chips",
+                },
+                'crop': {
+                    '1': "Amanaccessassist/finetuned-potato-food",
+                    '2': "Amanaccessassist/finetuned-mango-food",
+                }
+            }
+
+            model_name = model_name_map.get(filter_type.lower(), {}).get(crop_id)
+            if not model_name:
+                return Response({'error': 'Invalid crop ID or filter type'}, status=status.HTTP_400_BAD_REQUEST)
+
+            # Process image and get disease information
+            pil_image = Image.open(image)
+            disease_name, disease_images = process_image(pil_image, model_name)
+
+            if user_language == 1:
+                obj = DiseaseMaster.objects.filter(name=disease_name, fk_crops__id__in=related_crop_ids[crop_id], fk_language_id=user_language).first()
+            elif user_language == 2:
+                try:
+                    language = LanguageSelection.objects.get(id=user_language)
+                    disease_translations = DiseaseTranslation.objects.filter(fk_disease__name=disease_name, fk_language=language)
+                    if disease_translations.exists():
+                        disease_translation = disease_translations.first()
+                        disease_name = disease_translation.translation
+                        obj = DiseaseMaster.objects.filter(name=disease_name, fk_crops__id__in=related_crop_ids[crop_id]).first()
+                    else:
+                        return Response({'error': f'Disease translation not found for language {user_language}'}, status=status.HTTP_404_NOT_FOUND)
+                except LanguageSelection.DoesNotExist:
+                    return Response({'error': 'Invalid language ID'}, status=status.HTTP_400_BAD_REQUEST)
+            else:
+                return Response({'error': 'Invalid user language'}, status=status.HTTP_400_BAD_REQUEST)
+
+            if not obj:
+                return Response({'error': 'Disease not found in database'}, status=status.HTTP_404_NOT_FOUND)
+
+            # Serialize disease images and product info
+            disease_images_queryset = Disease_Images_Master.objects.filter(fk_disease__id=obj.id)
+            disease_images_serialized = DiseaseImagesMasterSerializer(disease_images_queryset, many=True).data
+
+            upload_disease = Upload_Disease.objects.create(
+                fk_provider_id=service_provider_id,
+                fk_crop_id=crop_id,
+                fk_disease=obj,
+                filter_type=filter_type,
+                uploaded_image=image,
+                fk_user=farmer_profile,
+                created_dt=datetime.now(),
+                fk_farmer_land_id=fk_farm_id,
+                state=state,
+                district=district,
+                fk_language_id=user_language
+            )
+
+            disease_images_serialized.insert(0, {'disease_file': upload_disease.uploaded_image.url if upload_disease.uploaded_image else None})
+
+            product_disease_queryset = DiseaseProductInfo.objects.filter(
+                fk_disease__name=disease_name,
+                fk_crop__id__in=related_crop_ids[crop_id]
+            ).distinct().prefetch_related('fk_product')
+
+            product_disease_serialized = DiseaseProductInfoSerializer(product_disease_queryset, many=True).data
+
+            disease_results = {
+                'disease_id': obj.id,
+                'disease': obj.name,
+                'crop_id': int(crop_id),
+                'symptom': obj.symptom,
+                'treatmentbefore': obj.treatmentbefore,
+                'treatmentfield': obj.treatmentfield,
+                'treatment': obj.treatment,
+                'message': obj.message,
+                'suggestiveproduct': obj.suggestiveproduct,
+                'images': disease_images_serialized,
+                'base_path': '/media/disease'
+            }
+
+            return Response({
+                'disease_results': disease_results,
+                'product_disease': product_disease_serialized
+            }, status=status.HTTP_200_OK)
 
         except Exception as e:
             error_message = str(e)
@@ -1354,6 +1401,8 @@ class GetSingleDiagnosisReport(APIView):
             try:
                 farmer_profile=FarmerProfile.objects.get(user=user)
                 print(f"Farmer profile :{farmer_profile}")
+                user_language=farmer_profile.fk_language.id
+                print(f"Farmer Language is :{user_language}")
             except FarmerProfile.DoesNotExist:
                 return Response({'status': 'error','message': 'Farmer profile not found for this user'}, status=status.HTTP_404_NOT_FOUND)
 
@@ -1398,12 +1447,10 @@ class GetDiagnosisReport(APIView):
         user=request.user
         print(f"User is {user}")
         try:
-            user_language = request.query_params.get('user_language')
-            if not user_language:
-                return Response({'status': 'error','message': 'User Language is required'}, status=status.HTTP_400_BAD_REQUEST)
             if user.user_type=="farmer":
                 try:
                     farmer_profile=FarmerProfile.objects.get(user=user)
+                    user_language=farmer_profile.fk_language.id
                     print(f"Farmer profile :{farmer_profile}")
                 except FarmerProfile.DoesNotExist:
                     return Response({'status': 'error','message': 'Farmer profile not found for this user'}, status=status.HTTP_404_NOT_FOUND)
@@ -1412,7 +1459,7 @@ class GetDiagnosisReport(APIView):
                 fk_user=farmer_profile,
                 fk_language_id=user_language,
                 is_deleted=False
-                ).select_related('fk_provider', 'fk_disease', 'fk_crop')
+                ).select_related('fk_provider', 'fk_disease', 'fk_crop').order_by('-id')
                 print(f"User Diseases: {user_disease}")
 
             if not user_disease.exists():
@@ -1475,11 +1522,16 @@ class GetallGovtSchemes(APIView):
         user=request.user
         print(f"User is {user.user_type}")
         try:
-            user_language = request.query_params.get('user_language', None)
             filter_type = request.query_params.get('filter_type', 'all')
-            if not user_language and filter_type!= 'all':
-                return Response({'message': 'user_language is required for filter_type other than all'}, status=status.HTTP_400_BAD_REQUEST)
+            if not filter_type:
+                return Response({'status': 'error','message': 'Filter type is required'}, status=status.HTTP_400_BAD_REQUEST)
             if user.user_type=="farmer":
+                try:
+                    farmer_profile=FarmerProfile.objects.get(user=user)
+                    user_language=farmer_profile.fk_language.id
+                    print(f"Farmer profile :{farmer_profile}")
+                except FarmerProfile.DoesNotExist:
+                    return Response({'status': 'error','message': 'Farmer profile not found for this user'}, status=status.HTTP_404_NOT_FOUND)
                 schemes = GovtSchemes.objects.all()
                 if user_language:
                     schemes = schemes.filter(fk_language_id=user_language)
@@ -1510,12 +1562,17 @@ class GovtSchemesbyID(APIView):
         print(f"User is {user.user_type}")
         try:
             govt_id =request.query_params.get ('govt_id')
-            user_language =request.query_params.get('user_language')
             
-            if not govt_id or not user_language:
-                return Response({'message': 'govt_id and user_language are required'}, status=status.HTTP_400_BAD_REQUEST)
+            if not govt_id:
+                return Response({'message': 'govt_id is required'}, status=status.HTTP_400_BAD_REQUEST)
             
             if user.user_type=="farmer":
+                try:
+                    farmer_profile=FarmerProfile.objects.get(user=user)
+                    user_language=farmer_profile.fk_language.id
+                    print(f"Farmer profile :{farmer_profile}")
+                except FarmerProfile.DoesNotExist:
+                    return Response({'status': 'error','message': 'Farmer profile not found for this user'}, status=status.HTTP_404_NOT_FOUND)
                 govt_schemes = GovtSchemes.objects.filter(id=govt_id, fk_language_id=user_language)
                 if not govt_schemes.exists():
                     return Response({'message': 'No schemes found'}, status=status.HTTP_404_NOT_FOUND)
@@ -1544,13 +1601,18 @@ class GetCurrentNews(APIView):
         user=request.user
         print(f"User is {user.user_type}")
         try:
-            user_language = request.query_params.get('user_language', None)
             filter_type = request.query_params.get('filter_type', 'all')
             limit = request.query_params.get('limit', 20)  
             offset = request.query_params.get('offset', 0) 
-            if not user_language and filter_type:
-                return Response({'message': 'user_language is required for filter_type required'}, status=status.HTTP_400_BAD_REQUEST)
+            if not filter_type:
+                return Response({'message': 'FilterType is Required'}, status=status.HTTP_400_BAD_REQUEST)
             if user.user_type=="farmer":
+                try:
+                    farmer_profile=FarmerProfile.objects.get(user=user)
+                    user_language=farmer_profile.fk_language.id
+                    print(f"Farmer profile :{farmer_profile}")
+                except FarmerProfile.DoesNotExist:
+                    return Response({'status': 'error','message': 'Farmer profile not found for this user'}, status=status.HTTP_404_NOT_FOUND)
                 news = CurrentNews.objects.all()
                 if user_language:
                     news = news.filter(fk_language_id=user_language)
@@ -1619,7 +1681,6 @@ class Fertilizerswithtest(APIView):
         print(f"User is {user.user_type}")
         try:
             data = request.data
-            user_language = data.get('user_language')
             farm_id = data.get('farm_id')
             crop_id = data.get('crop_id')
             nitrogen = data.get('nitrogen')
@@ -1633,7 +1694,8 @@ class Fertilizerswithtest(APIView):
                 return Response({'error': 'Missing required nutrient values'}, status=status.HTTP_400_BAD_REQUEST)
             if user.user_type=="farmer":
                 try:
-                    farmer_profile = FarmerProfile.objects.get(user=user, fk_language_id=user_language)
+                    farmer_profile = FarmerProfile.objects.get(user=user)
+                    user_language=farmer_profile.fk_language.id
                 except FarmerProfile.DoesNotExist:
                     return Response({'error': 'FarmerProfile not found'}, status=status.HTTP_404_NOT_FOUND)
 
@@ -1712,34 +1774,42 @@ class Fertilizerswithtest(APIView):
         try:
             user = request.user
             farm_id = request.query_params.get('farm_id')
-            user_language = request.query_params.get('user_language')
             crop_id = request.query_params.get('crop_id')
             if crop_id not in ["1"]:
                 return Response({'error': 'Crop ID is not supported'}, status=status.HTTP_400_BAD_REQUEST)
-
-            if not user_language:
-                return Response({'error': 'Missing required fields'}, status=status.HTTP_400_BAD_REQUEST)
 
             if user.user_type != "farmer":
                 return Response({'error': 'User is not authorized to access this information'}, status=status.HTTP_403_FORBIDDEN)
 
             try:
-                farmer_profile = FarmerProfile.objects.get(user=user, fk_language_id=user_language)
+                farmer_profile = FarmerProfile.objects.get(user=user)
+                user_language=farmer_profile.fk_language.id
             except FarmerProfile.DoesNotExist:
                 return Response({'error': f'FarmerProfile not found for user_id: {user}'}, status=status.HTTP_404_NOT_FOUND)
 
             if farm_id:
                 try:
                     farm = FarmerLandAddress.objects.get(id=farm_id, fk_farmer=farmer_profile, fk_crops__id=crop_id)
-                    state = farm.fk_state.state if farm.fk_state else None
+                    if user_language == 1:  
+                        state = farm.fk_state.eng_state if farm.fk_state else None
+                        print(f"State is :{state}")
+                        district = farm.fk_district.eng_district if farm.fk_district else None
+                        print(f"District is :{district}")
+                    elif user_language == 2:  
+                        state = farm.fk_state.hin_state if farm.fk_state else None
+                        print(f"State is :{state}")
+                        district = farm.fk_district.hin_district if farm.fk_district else None
+                        print(f"District is :{district}")
+                    else:
+                        return Response({'error': 'Invalid user language'}, status=status.HTTP_400_BAD_REQUEST)
                 except FarmerLandAddress.DoesNotExist:
                     return Response({'error': 'Invalid farmer land ID'}, status=status.HTTP_404_NOT_FOUND)
 
             try:
-                if user_language=="1":
+                if user_language==1:
                     crop_name = CropMapper.objects.get(id=crop_id).eng_crop.crop_name
                     print(f"English Crop Name is :{crop_name}")
-                elif user_language=="2":
+                elif user_language==2:
                     crop_name = CropMapper.objects.get(id=crop_id).hin_crop.crop_name
                     print(f"Hindi Crop Name is :{crop_name}")
             except CropMapper.DoesNotExist:
@@ -1822,15 +1892,16 @@ class AdvanceFertilizercalculator(APIView):
                 return Response({'error': 'Crop ID is not supported'}, status=status.HTTP_400_BAD_REQUEST)
             if user.user_type=="farmer":
                 try:
-                    farmer_profile = FarmerProfile.objects.get(user=user, fk_language_id=user_language)
+                    farmer_profile = FarmerProfile.objects.get(user=user)
+                    user_language=farmer_profile.fk_language.id
                 except FarmerProfile.DoesNotExist:
                     return Response({'error': 'FarmerProfile not found for user_id'}, status=status.HTTP_404_NOT_FOUND)
             
                 try:
-                    if user_language=="1":
+                    if user_language==1:
                         crop_name = CropMapper.objects.get(id=crop_id).eng_crop.crop_name
                         print(f"English Crop Name is :{crop_name}")
-                    elif user_language=="2":
+                    elif user_language==2:
                         crop_name = CropMapper.objects.get(id=crop_id).hin_crop.crop_name
                         print(f"Hindi Crop Name is :{crop_name}")
                 except CropMaster.DoesNotExist:
@@ -2174,9 +2245,7 @@ class VegetableStagesAPIView(APIView):
         crop_id = request.data.get('crop_id')
         farm_id = request.data.get('land_id')
         filter_type = request.data.get('filter_type')
-        user_language = request.data.get('user_language')
-
-        required_fields = ['crop_id', 'filter_type', 'user_language']
+        required_fields = ['crop_id', 'filter_type']
         for field in required_fields:
             if not request.data.get(field):
                 return Response({'message': f'Missing or empty field: {field}'}, status=status.HTTP_400_BAD_REQUEST)
@@ -2184,6 +2253,8 @@ class VegetableStagesAPIView(APIView):
             if user.user_type == "farmer":
                 try:
                     farmer = FarmerProfile.objects.get(user=user)
+                    user_language=farmer.fk_language.id
+                    print(f"Farmer Language is :{farmer}")
                 except FarmerProfile.DoesNotExist:
                     return Response({'message': 'Farmer Not Found'}, status=status.HTTP_404_NOT_FOUND)
                 farm = None
@@ -2413,6 +2484,7 @@ class VegetableStagesAPIView(APIView):
                         'is_completed': stage_completion.is_completed,
                         'days_spent': stage_completion.total_days_spent,
                         'start_date': stage_completion.start_date,
+                        'user_language':user_language,
                         'products': products
                     })
 
@@ -2445,9 +2517,8 @@ class MarkVegetableStageCompleteAPIView(APIView):
         filter_type = request.data.get('filter_type')
         preference_number = request.data.get('preference_number')
         submit_task = request.FILES.get('submit_task')
-        user_language = request.data.get('user_language')
 
-        required_fields = ['crop_id', 'filter_type', 'preference_number', 'user_language']
+        required_fields = ['crop_id', 'filter_type', 'preference_number']
         for field in required_fields:
             if not request.data.get(field):
                 return Response({'message': f'Missing or empty field: {field}'}, status=status.HTTP_400_BAD_REQUEST)
@@ -2456,6 +2527,8 @@ class MarkVegetableStageCompleteAPIView(APIView):
             if user.user_type == "farmer":
                 try:
                     farmer = FarmerProfile.objects.get(user=user)
+                    user_language=farmer.fk_language.id
+                    print(f"Farmer Language is :{farmer}")
                 except FarmerProfile.DoesNotExist:
                     return Response({'message': 'Farmer Not Found'}, status=status.HTTP_404_NOT_FOUND)
 
@@ -2520,6 +2593,7 @@ class MarkVegetableStageCompleteAPIView(APIView):
                             'stage_id': stage_completion.vegetable_pop.id,
                             'stage_number': stage_completion.stage_number,
                             'days_to_complete': stage_completion.total_days_spent,
+                            'user_language':user_language,
                             'preference_number': stage.preference
                         })
 
@@ -2621,59 +2695,104 @@ class VegetableProgressAPIView(APIView):
 
     def get(self, request, format=None):
         user = request.user
-        crop_id = request.query_params.get('crop_id')
-        farm_id=request.query_params.get('land_id')
-        filter_type = request.query_params.get('filter_type')
+        farm_id = request.query_params.get('land_id')
+        crops_data = request.data.get('crops')  # Access the crops data directly from the request body
 
-        if not crop_id or not filter_type:
-            return Response({'message': 'Missing crop_id or filter_type'}, status=status.HTTP_400_BAD_REQUEST)
+        if not crops_data:
+            return Response({'message': 'Missing crops data'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            # Assume the crops_data is already parsed JSON from request.data
+            crops = crops_data
+        except (TypeError, ValueError):
+            return Response({'message': 'Invalid crops data format'}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
             if user.user_type == "farmer":
                 try:
                     farmer = FarmerProfile.objects.get(user=user)
+                    user_language = farmer.fk_language.id
                 except FarmerProfile.DoesNotExist:
                     return Response({'message': 'Farmer Not Found'}, status=status.HTTP_404_NOT_FOUND)
-                farm=None
+
+                farm = None
                 if farm_id:
                     try:
-                        farm = FarmerLandAddress.objects.get(id=farm_id, fk_farmer=farmer, fk_crops__id=crop_id)
+                        farm = FarmerLandAddress.objects.get(id=farm_id, fk_farmer=farmer)
                     except FarmerLandAddress.DoesNotExist:
                         return Response({'error': 'Invalid farmer land ID'}, status=status.HTTP_404_NOT_FOUND)
 
-                total_preferences = VegetablePop.objects.filter(
-                    fk_crop_id=crop_id,
-                    fk_croptype_id=filter_type
-                ).values('preference').distinct().count()
+                crops_progress = []
+                crops_with_no_data = []
 
-                if total_preferences == 0:
-                    return Response({'message': 'No preferences found for this crop'}, status=status.HTTP_404_NOT_FOUND)
+                for crop_data in crops:
+                    crop_id = crop_data.get('crop_id')
+                    filter_type = crop_data.get('filter_type')
 
-                completed_preferences = VegetablePreferenceCompletion.objects.filter(
-                    fk_farmer=farmer,
-                    fk_farmland=farm,
-                    fk_crop_id=crop_id,
-                    fk_croptype_id=filter_type,
-                    is_completed=True
-                ).count()
+                    if not crop_id or not filter_type:
+                        continue
 
-                overall_progress = (completed_preferences / total_preferences) * 100
+                    # Get total preferences for the crop
+                    total_preferences = VegetablePop.objects.filter(
+                        fk_crop_id=crop_id,
+                        fk_croptype_id=filter_type,
+                        fk_language=user_language
+                    ).values('preference').distinct().count()
 
-                preference_progress = VegetablePreferenceCompletion.objects.filter(
-                    fk_farmer=farmer,
-                    fk_farmland=farm,
-                    fk_croptype_id=filter_type,
-                    fk_crop_id=crop_id
-                ).values('preference_number', 'progress', 'is_completed', 'name')
+                    if total_preferences == 0:
+                        crops_with_no_data.append({'crop_id': crop_id, 'filter_type': filter_type})
+                        continue
 
-                response_data = {
-                    'overall_progress': round(overall_progress, 2),
-                    'total_preferences': total_preferences,
-                    'completed_preferences': completed_preferences,
-                    'preference_details': list(preference_progress)
-                }
+                    # Get completed preferences
+                    completed_preferences = VegetablePreferenceCompletion.objects.filter(
+                        fk_farmer=farmer,
+                        fk_farmland=farm,
+                        fk_crop_id=crop_id,
+                        fk_croptype_id=filter_type,
+                        fk_language=user_language,
+                        is_completed=True
+                    ).count()
 
-                return Response(response_data)
+                    # Calculate overall progress
+                    overall_progress = (completed_preferences / total_preferences) * 100
+
+                    # Get preference progress details
+                    preference_progress = VegetablePreferenceCompletion.objects.filter(
+                        fk_farmer=farmer,
+                        fk_farmland=farm,
+                        fk_croptype_id=filter_type,
+                        fk_crop_id=crop_id,
+                        fk_language=user_language
+                    ).values('preference_number', 'progress', 'is_completed', 'name')
+
+                    crop_progress = {
+                        'crop_id': crop_id,
+                        'user_language':user_language,
+                        'filter_type': filter_type,
+                        'overall_progress': round(overall_progress, 2),
+                        'total_preferences': total_preferences,
+                        'completed_preferences': completed_preferences,
+                        'preference_details': list(preference_progress)
+                    }
+
+                    crops_progress.append(crop_progress)
+
+                response_data = {}
+
+                if crops_progress:
+                    response_data['crops_progress'] = crops_progress
+
+                if crops_with_no_data:
+                    response_data['crops_with_no_data'] = crops_with_no_data
+
+                # Determine the appropriate status code based on the data available
+                status_code = status.HTTP_200_OK
+                if not crops_progress:
+                    status_code = status.HTTP_404_NOT_FOUND
+                elif crops_with_no_data:
+                    status_code = status.HTTP_206_PARTIAL_CONTENT
+
+                return Response(response_data, status=status_code)
             else:
                 return Response({'message': 'User is not a farmer'}, status=status.HTTP_403_FORBIDDEN)
 

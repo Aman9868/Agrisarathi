@@ -9,20 +9,15 @@ class LangaugeSelectionAdmin(admin.ModelAdmin):
 #########################-------------------------State Master--------------------------##################
 @admin.register(StateMaster)
 class StateMasterAdmin(admin.ModelAdmin):
-    list_display = ('id','state', 'getlanguage')
-    def getlanguage(self,obj):
-        return obj.fk_language.language if obj.fk_language else None
-    getlanguage.short_description='Language'
+    list_display = ('id','eng_state', 'hin_state')
 #########################----------------------------Distict Master-------------------------#############
 @admin.register(DistrictMaster)
 class DistrictMasterAdmin(admin.ModelAdmin):
-    list_display=('id','getstate','district','getlanguage','created_at')
-    def getstate(self,obj):
-        return obj.fk_state.state if obj.fk_state else None
-    getstate.short_description='State'
-    def getlanguage(self,obj):
-        return obj.fk_language.language if obj.fk_language else None
-    getlanguage.short_description='Language'
+    list_display=('id','getstate','eng_district','hin_district','created_at')
+    def getstate(self, obj):
+        eng_crop_name = obj.fk_state.eng_state if obj.fk_state and obj.fk_state.eng_state else ""
+        hin_crop_name = obj.fk_state.hin_state if obj.fk_state and obj.fk_state.hin_state else ""
+        return f"{eng_crop_name} / {hin_crop_name}".strip(" / ")
 
 #########################----------------------Farmers------------------------###################
 @admin.register(FarmerProfile)
@@ -46,7 +41,7 @@ class FarmerofileAdmin(admin.ModelAdmin):
         super().save_model(request, obj, form, change)
 @admin.register(FarmerLandAddress)
 class FarmerLandAddressAdmin(admin.ModelAdmin):
-    list_display = ('id','fk_farmer', 'land_area', 'address','get_combined_crop_name','pincode', 'get_state', 'get_district', 'village', 'lat1', 'lat2',
+    list_display = ('id','fk_farmer', 'land_area', 'address','get_combined_crop_name','pincode',  'village', 'lat1', 'lat2',
                     'tehsil')
     def get_combined_crop_name(self, obj):
         eng_crop_name = obj.fk_crops.eng_crop.crop_name if obj.fk_crops and obj.fk_crops.eng_crop else ""
@@ -54,17 +49,10 @@ class FarmerLandAddressAdmin(admin.ModelAdmin):
         return f"{eng_crop_name} / {hin_crop_name}".strip(" / ")
     
     get_combined_crop_name.short_description = 'Crop Name'
-    def get_state(self,obj):
-        return obj.fk_state.state if obj.fk_state else None
-    get_state.short_description='State'
-    def get_district(self,obj):
-        return obj.fk_district.district if obj.fk_district else None
-    get_district.short_description='District'
 #############------------------------------------------Fertilizers Admin---------------------------####################
 @admin.register(Fertilizer)
 class FertilizerAdmin(admin.ModelAdmin):
-    list_display = ('get_state', 'fk_language', 'nitrogen', 'phosphorus', 'potassium', 'zincsulphate', 'measurement_type')
-    search_fields = ('fk_state__state', 'fk_language__language')  
+    list_display = ('fk_language', 'nitrogen', 'phosphorus', 'potassium', 'zincsulphate', 'measurement_type')
     list_filter = ('measurement_type',)
     def get_state(self,obj):
         return obj.fk_state.state if obj.fk_state else None

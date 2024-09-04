@@ -4,7 +4,6 @@ from django.contrib.auth.models import AbstractUser, PermissionsMixin,AbstractBa
 from django.core.exceptions import ValidationError
 from django.utils.translation import gettext_lazy as _
 import re
-
 class CustomUserManager(BaseUserManager):
     def create_user(self, mobile, password=None, **extra_fields):
         if not mobile:

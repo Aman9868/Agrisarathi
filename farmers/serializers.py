@@ -7,9 +7,10 @@ from rest_framework.pagination import LimitOffsetPagination
 
 ######################----------------------------------------Farmer Serialzier--------------------------###########
 class FarmerRegistrationSerializer(serializers.ModelSerializer):
+    user_language = serializers.IntegerField(write_only=True)
     class Meta:
         model = CustomUser
-        fields = ['mobile', 'email']
+        fields = ['mobile', 'email','user_language']
 
     def __init__(self, *args, **kwargs):
         self.user_type = kwargs.pop('user_type', None)
@@ -18,6 +19,7 @@ class FarmerRegistrationSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         if self.user_type is None:
             raise ValueError("user_type must be provided")
+        user_language = validated_data.pop('user_language')
 
         user = CustomUser.objects.create_user(
             mobile=validated_data.get('mobile'),
@@ -26,11 +28,11 @@ class FarmerRegistrationSerializer(serializers.ModelSerializer):
         )
 
         if self.user_type == 'farmer':
-            FarmerProfile.objects.create(user=user, mobile=user.mobile, email=user.email)
+            FarmerProfile.objects.create(user=user, mobile=user.mobile, email=user.email,fk_language_id=user_language)
         else:
             raise ValueError("Invalid user type")
 
-        print(f"Created {self.user_type} user: {user}")
+        print(f"Created {self.user_type} user: {user} with language: {user_language}")
         return user
     
 #########---------------------------Farmer Profile---------------------###############
@@ -67,29 +69,48 @@ class FarmerLandAddressSerializer(serializers.ModelSerializer):
 class POPCropTypeSerializer(serializers.ModelSerializer):
     pop_id = serializers.SerializerMethodField()
     pop_name = serializers.SerializerMethodField()
-    season = serializers.SerializerMethodField()
-    season_id=serializers.IntegerField(source='season_map.id', read_only=True)
+    #season = serializers.SerializerMethodField()
+    season_id = serializers.IntegerField(source='season_map.id', read_only=True)
+    
     class Meta:
         model = POPMapper
-        fields = ['pop_id', 'pop_name', 'season','season_id']
+        fields = ['pop_id', 'pop_name','season_id']
 
     def get_pop_id(self, obj):
-        return obj.id  
+        return obj.id
 
     def get_pop_name(self, obj):
         user_language = self.context.get('user_language')
-        if user_language == '1':
+        if user_language == 1:  # Assuming 1 is English
             return obj.eng_pop.name if obj.eng_pop else None
-        elif user_language == '2':
+        elif user_language == 2:  # Assuming 2 is Hindi
             return obj.hin_pop.name if obj.hin_pop else None
         return None
 
     def get_season(self, obj):
         user_language = self.context.get('user_language')
-        if user_language=='1':
-            return obj.season_map.eng_season.season if obj.season_map else None
-        elif user_language=='2':
-            return obj.season_map.hin_season.season if obj.season_map else None
+        if obj.season_map:
+            if user_language == 1:  # Assuming 1 is English
+                return obj.season_map.eng_season if obj.season_map.eng_season else None
+            elif user_language == 2:  # Assuming 2 is Hindi
+                return obj.season_map.hin_season if obj.season_map.hin_season else None
+        return None
+        
+##############################--------------------------CROP VARIRTY--------------------###############
+class CropVarietySerializer(serializers.ModelSerializer):
+    name = serializers.SerializerMethodField()
+    class Meta:
+        model = CropVariety
+        fields = ['id', 'name']
+
+    def get_name(self, obj):
+        user_language = self.context.get('user_language')
+        if user_language == 1:  
+            return obj.eng_name
+        elif user_language == 2: 
+            return obj.hin_name
+        else:
+            return None
 ###############################--------------------------Service Providers Serializer--------------------------------##
 class ServiceProviderSerializer(serializers.ModelSerializer):
     name = serializers.SerializerMethodField()
@@ -107,15 +128,34 @@ class ServiceProviderSerializer(serializers.ModelSerializer):
         return None
 ##############---------------------------------All States Serializer---------------------###########
 class StatesSerializer(serializers.ModelSerializer):
+    state_name = serializers.SerializerMethodField()
     class Meta:
         model = StateMaster
-        fields = '__all__'
+        fields = ['id', 'state_name']
+    def get_state_name(self, obj):
+        user_language = self.context.get('user_language')
+        if user_language == 1:  
+            return obj.eng_state
+        elif user_language == 2: 
+            return obj.hin_state
+        else:
+            return None
 
 ##############---------------------------------All District Serializer---------------------###########
 class DistrictMasterSerializer(serializers.ModelSerializer):
+    district_name = serializers.SerializerMethodField()
     class Meta:
         model = DistrictMaster
-        fields = '__all__' 
+        fields = ['id','district_name'] 
+
+    def get_district_name(self, obj):
+        user_language = self.context.get('user_language')
+        if user_language == 1:  
+            return obj.eng_district
+        elif user_language == 2: 
+            return obj.hin_district
+        else:
+            return None
 ######################----------------------------------------Initial Screen Crops--------------------------###########
 class CropImagesSerializer(serializers.ModelSerializer):
     class Meta:

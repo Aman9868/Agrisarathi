@@ -38,16 +38,16 @@ class Service_Provider(models.Model):
 
 #####################------------------------------------States--------------------#################
 class StateMaster(models.Model):
-    state = models.CharField(null=True, blank=True, max_length=100)
+    eng_state = models.CharField(null=True, blank=True, max_length=100)
+    hin_state = models.CharField(null=True, blank=True, max_length=100)
     created_at=models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    fk_language=models.ForeignKey(LanguageSelection,on_delete=models.CASCADE,null=True,blank=True)
     is_deleted = models.BooleanField(default=False)
 ##################################--------------------District---------------------#############
 class DistrictMaster(models.Model):
     fk_state = models.ForeignKey(StateMaster, on_delete=models.CASCADE, null=True, blank=True)
-    fk_language=models.ForeignKey(LanguageSelection,on_delete=models.CASCADE,null=True,blank=True)
-    district=models.CharField(null=True, blank=True, max_length=100)
+    eng_district=models.CharField(null=True, blank=True, max_length=100)
+    hin_district=models.CharField(null=True, blank=True, max_length=100)
     created_at=models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     is_deleted = models.BooleanField(default=False)
@@ -239,8 +239,6 @@ class FarmerLandAddress(models.Model):
     tehsil=models.CharField(null=True, blank=True, max_length=100)
     fk_crops=models.ForeignKey(CropMapper,on_delete=models.CASCADE,null=True,blank=True)
     sowing_date = models.DateField(null=True,blank=True)
-    fk_croptype=models.ForeignKey(POPTypes,on_delete=models.CASCADE,null=True,blank=True)
-    fk_language=models.ForeignKey(LanguageSelection,on_delete=models.CASCADE,null=True,blank=True)
     his_land=models.BooleanField(null=True, blank=True,default=True)
     is_deleted = models.BooleanField(default=False)
 

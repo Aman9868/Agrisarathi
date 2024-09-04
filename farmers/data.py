@@ -197,7 +197,7 @@ def AddCropVariety(request):
             data = json.loads(request.body.decode('utf-8'))
             crop_id=data.get('crop_id')
             user_language=data.get('user_language')
-            excel_file = r'/home/Agrisarathi/agrisarthi/staticfiles/PotaoVariety.xlsx'
+            excel_file = r'/home/aman/backend/AgrisarthiProject/agrisarthi/PotaoVariety.xlsx'
             data_xl = pd.read_excel(excel_file,sheet_name='eng')
             for index, row in data_xl.iterrows():
                 CropVariety.objects.create(
