@@ -306,7 +306,7 @@ class FPOProductDetailSerializer(serializers.ModelSerializer):
     product_id = serializers.IntegerField(source='fk_product.id')
     productName = serializers.CharField(source='fk_product.productName')
     supplier_name = serializers.CharField(source='fk_fposupplier.party_name')
-    product_price = serializers.FloatField(source='fk_price.unit_price')
+    product_price = serializers.SerializerMethodField()
     Category = serializers.CharField(source='fk_product.Category')
     product_type = serializers.CharField(source='fk_product.fk_productype.product_type')
     stock_quantity = serializers.IntegerField(source='stock')
@@ -318,6 +318,14 @@ class FPOProductDetailSerializer(serializers.ModelSerializer):
         return obj.stock_status() if obj else None
     def get_supplier_id(self, obj):
         return obj.fk_fposupplier.id if obj.fk_fposupplier else None
+    
+    def get_product_price(self, obj):
+        try:
+            product_price = ProductPrices.objects.filter(fk_product=obj.fk_product).first()
+            print(f"Product price:{product_price}")
+            return product_price.unit_price if product_price else None
+        except ProductPrices.DoesNotExist:
+            return None
     
 class SupplierProductDetailSerializer(serializers.ModelSerializer):
     inventory_id=serializers.IntegerField(source='id')

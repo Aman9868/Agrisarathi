@@ -438,6 +438,7 @@ class AddFarmerCsv(APIView):
         print(f"User is {user.user_type}")
         try:
             csv_file = request.FILES.get('csv_file')
+            user_type=user.user_type
             if not csv_file:
                 return Response({'message': 'CSV file is required'}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -479,7 +480,7 @@ class AddFarmerCsv(APIView):
                             continue
 
                         if not FarmerProfile.objects.filter(mobile=mobile, fpo_name=fpo_profile).exists():
-                            user=CustomUser.objects.create(mobile=mobile,user_type='farmer')
+                            CustomUser.objects.create(mobile=mobile,user_type=user_type)
                             FarmerProfile.objects.create(
                                 user=user,
                                 fpo_name=fpo_profile,
@@ -1144,7 +1145,7 @@ class ADDProductDetailsCSV(APIView):
 #####################----------------------GEt all Productby FPO and Suppliers------------------###############
 class GetAllProductsFponSupplier(APIView):
     permission_classes = [IsAuthenticated]
-    def get(self, request, *args, **kwargs):
+    def get(self, request,format=None):
         try:
             user = request.user
             print(f"User is :{user.user_type}")
@@ -1155,6 +1156,7 @@ class GetAllProductsFponSupplier(APIView):
                 except FPO.DoesNotExist:
                         return Response({'error': 'FPO details not found'}, status=status.HTTP_404_NOT_FOUND)
                 products = InventoryDetails.objects.filter(fk_fpo=fpo_profile)
+                print(f"Product Are:{products}")
                 if not products.exists():
                     return Response({'message': 'No products found for the specified filter type'}, status=status.HTTP_404_NOT_FOUND)
                 data=FPOProductDetailSerializer(products,many=True)

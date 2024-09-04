@@ -1881,7 +1881,6 @@ class AdvanceFertilizercalculator(APIView):
             data = request.data
             farm_id = data.get('farm_id')
             crop_id = data.get('crop_id')
-            user_language = data.get('user_language')
             daep = data.get('daep', 0)
             complexes = data.get('complexes', 0)
             urea = data.get('urea', 0)
