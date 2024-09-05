@@ -44,12 +44,13 @@ class FarmerProfileSerializer(serializers.ModelSerializer):
 class FarmerLandAddressSerializer(serializers.ModelSerializer):
     state = serializers.CharField(source='fk_state.state', read_only=True)
     crop_id = serializers.IntegerField(source='fk_crops.id', read_only=True)
+    filter_id = serializers.IntegerField(source='fk_croptype.id', read_only=True)
     district = serializers.SerializerMethodField()
     crop = serializers.SerializerMethodField()
     crop_images=serializers.SerializerMethodField()
     class Meta:
         model = FarmerLandAddress
-        fields = ['id', 'land_area', 'address', 'state', 'district', 'tehsil', 'crop','crop_images','crop_id']
+        fields = ['id', 'land_area', 'address', 'state', 'district', 'tehsil', 'crop','crop_images','crop_id','filter_id']
     def get_crop_images(self, obj):
         crop_images = CropImages.objects.filter(fk_cropmaster=obj.fk_crops)
         return [image.crop_image.url for image in crop_images]
@@ -297,7 +298,7 @@ class SuggestedCropSerializer(serializers.ModelSerializer):
 #############################-------------------------Vegetabel Notifciations---------------------################
 class WeatherNotificationSerializer(serializers.ModelSerializer):
     weather_id=serializers.IntegerField(source='id',read_only=True)
-    crop_id=serializers.CharField(source='fk_crops.id', read_only=True,default=None)
+    crop_id=serializers.IntegerField(source='fk_crops.id', read_only=True,default=None)
     class Meta:
         model = WeatherPopNotification
         fields = ['weather_id', 'crop_id','stages','gif','preference_number','notification_text']

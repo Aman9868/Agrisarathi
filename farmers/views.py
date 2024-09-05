@@ -533,7 +533,7 @@ class GetInitialScreenCrops(APIView):
                         'status': crop.crop_status,
                         'crop_name': crop.crop_name,
                         'season_name': season.season if season else None,
-                        'croptype_id': pop_mapper.id if pop_mapper else None, 
+                        'filter_id': pop_mapper.id if pop_mapper else None, 
                         'season_id': season_mapper.id if season_mapper else None,
                         'crop_image': crop_image_url  
                     }
@@ -673,7 +673,8 @@ class FarmerAddGetallLandInfo(APIView):
                 lat1=request.data.get('lat1', None),
                 lat2=request.data.get('lat2', None),
                 fk_variety_id=request.data.get('variety_id',None),
-                his_land=request.data.get('is_land',None)
+                fk_croptype_id=request.data.get('filter_id'),
+                his_land=request.data.get('is_land')
             )
             land_address.save()
             return Response({'status':'success','message':'Land added successfully'},status=status.HTTP_200_OK)
@@ -2828,14 +2829,14 @@ class GetVegetablePopNotification(APIView):
                 crop_id = crop.get('crop_id')
                 land_id = crop.get('farm_id')
                 filter_type = crop.get('filter_type')
-                user_language = crop.get('user_language')
                 weather_conditions = crop.get('weather_conditions', [])
 
-                if not filter_type or not user_language:
-                    return Response({'message': f'Missing or empty field: filter_type, or user_language for crop_id {crop_id}'}, status=status.HTTP_400_BAD_REQUEST)
+                if not filter_type:
+                    return Response({'message': f'Missing or empty field: filter_type, for crop_id {crop_id}'}, status=status.HTTP_400_BAD_REQUEST)
 
                 try:
                     farmer = FarmerProfile.objects.get(user=request.user)
+                    user_language=farmer.fk_language.id
                 except FarmerProfile.DoesNotExist:
                     return Response({'message': 'Farmer Not Found'}, status=status.HTTP_404_NOT_FOUND)
 
@@ -2870,18 +2871,18 @@ class GetVegetablePopNotification(APIView):
                 fk_language_id=user_language,
                 fk_crops_id=crop_id,
                 fk_croptype_id=filter_type
-                                 )
+                                 ).distinct()
                 print(f"Notification Messages Found:{notification_messages}")
 
                 if notification_messages.exists():
                     notification_serializers = WeatherNotificationSerializer(notification_messages, many=True)
                     responses.append({
-                    'crop_id': crop_id,
+                    'crop_id': int(crop_id),
                     'notifications': notification_serializers.data
                     })
                 else:
                     responses.append({
-                    'crop_id': crop_id,
+                    'crop_id': int(crop_id),
                     'message': 'No notification found for the current weather conditions and preference',
                 })
 

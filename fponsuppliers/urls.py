@@ -28,6 +28,10 @@ urlpatterns = [
     path('CheckBuyerisFarmerorNot',CheckBuyerisFarmerorNot.as_view(),name='CheckBuyerisFarmerorNot'),
     path('GetallFPOCrops',GetallFPOCrops.as_view(),name='GetallFPOCrops'),      
     path('GetFPOCropVariety',GetFPOCropVariety.as_view(),name='GetFPOCropVariety'), 
-    path('GetAllProductsFponSupplier',GetAllProductsFponSupplier.as_view(),name='GetAllProductsFponSupplier'),                                                                                                                                                          
+    path('MonthlySales',MonthlySales.as_view(),name='MonthlySales'),
+    path('TotalSales',TotalSales.as_view(),name='TotalSales'),
+    path('GetAllProductsFponSupplier',GetAllProductsFponSupplier.as_view(),name='GetAllProductsFponSupplier'),
+    path('GetallFPOGovtSchemes',GetallFPOGovtSchemes.as_view(),name='GetAllFPOGovtSchemes'),      
+    path('FPOGovtSchemesbyID',FPOGovtSchemesbyID.as_view(),name='FPOGovtSchemesbyID'),                                                                                                                                                    
                                                                                     
 ]

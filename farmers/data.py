@@ -271,10 +271,10 @@ def AddPOP(request):
             user_language=data.get('user_language')
             crop_id=data.get('crop_id')
             filter_id=data.get('filter_id')
-            excel_file = r'/home/aman/backend/AgrisarthiProject/Agrisarthi/turmericpop.xlsx'
+            excel_file = r'/home/Agrisarathi/agrisarthi/staticfiles/greenpeas pop.xlsx'
             data_xl = pd.read_excel(excel_file,sheet_name='hin')
             for index, row in data_xl.iterrows():
-                SpicesPop.objects.create(
+                VegetablePop.objects.create(
                     fk_language_id=user_language,
                     fk_crop_id=crop_id,
                     stages=row['stages'],

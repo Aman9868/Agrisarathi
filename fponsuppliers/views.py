@@ -653,7 +653,8 @@ class ProductDetailsAddGetDelUpdate(APIView):
                 fk_product=product,
                 fk_fpo=fpo_profile,
                 stock=request.data.get('quantity', 0),
-                fk_fposupplier=supplier
+                fk_fposupplier=supplier,
+                fk_productype_id=producttype
                 )
                 return Response({'message': 'FPO Product created & Added successfully!'})
             elif user.user_type=='supplier':
@@ -1126,8 +1127,10 @@ class ADDProductDetailsCSV(APIView):
                         fk_product=product,
                         stock=row.get('Quantity', 0),
                         fk_inputsupplier=supplier,
-                        fk_supplier=supplier_info
+                        fk_supplier=supplier_info,
+                        fk_productype__id=producttype
                     )
+
 
             return Response({'message': 'Products created & added successfully!'})
         except Exception as e:
@@ -1184,28 +1187,32 @@ class PurchaseInfo(APIView):
         user=request.user
         print(f"User: {user}")
         try:
-            supplier_id=request.query_params.get('supplier_id')
             if user.user_type == 'fpo':
                 try:
                     fpo_profile = FPO.objects.get(user=user)
                     print(f"Fpo Profile : {fpo_profile}")
                 except FPO.DoesNotExist:
                     return Response({'error': 'Fpo details not found'}, status=status.HTTP_404_NOT_FOUND)
-                suppliers=FPOSuppliers.objects.filter(fk_fpo=fpo_profile,id=supplier_id)
+                suppliers=FPOSuppliers.objects.filter(fk_fpo=fpo_profile)
                 if not suppliers.exists():
-                    return Response({'message': 'No suppliers found'}, status=status.HTTP_404_NOT_FOUND)
-                serializer = FPOSuppliersSerializer(suppliers, many=True, context={'fpo_id': fpo_profile.id})
-                return Response({"message": "success", 'supplier_details': serializer.data}, status=status.HTTP_200_OK)
+                    return Response({'message': 'No suppliers found'}, status=status.HTTP_200_OK)
+                paginator=GetallPurchasePagination()
+                result_page = paginator.paginate_queryset(suppliers, request)
+                serializer = FPOSuppliersSerializer(result_page, many=True, context={'fpo_id': fpo_profile.id})
+                return paginator.get_paginated_response({
+                        'status': 'success',
+                        'data': serializer.data,
+                    })
             elif user.user_type =='supplier':
                 try:
                     supplier_profile = Supplier.objects.get(user=user)
                     print(f"Supplier Profile :{supplier_profile}")
                 except Supplier.DoesNotExist:
                     return Response({'error': 'Supplier details not found'}, status=status.HTTP_404_NOT_FOUND)
-                suppliers=InputSuppliers.objects.filter(fk_supplier=supplier_profile,id=supplier_id)
+                suppliers=InputSuppliers.objects.filter(fk_supplier=supplier_profile)
                 if not suppliers.exists():
                     return Response({'message': 'No suppliers found'}, status=status.HTTP_404_NOT_FOUND)
-                serializer = SupplierSupplySerializer(suppliers, many=True, context={'fk_supplier_id': supplier_profile.id})
+                serializer = ThirdPartySuppliersSerializer(suppliers, many=True, context={'fk_supplier_id': supplier_profile.id})
                 return Response({"message": "success", 'supplier_details': serializer.data}, status=status.HTTP_200_OK)
             else:
                 return Response({'message': 'Invalid user type'}, status=403)
@@ -1385,137 +1392,145 @@ class InventorySection(APIView):
 ########################------------------------------------Sales Section FPO/Supplier---------------###################
 class AddGetSales(APIView):
     permission_classes = [IsAuthenticated]
+
     def post(self, request, format=None):
         user = request.user
-        print(f"User: {user}")
         try:
-            buyer_name, mobile_no, address, sale_date, products, payment = map(request.data.get, 
-                    ['buyer_name', 'mobile_no', 'address', 'sale_date', 'products', 'payment'])
-            if not sale_date or not payment or not products or not mobile_no:
-                return Response({'error': 'Fields must be required'}, status=400)
+            buyer_name = request.data.get('buyer_name')
+            mobile_no = request.data.get('mobile_no')
+            address = request.data.get('address')
+            sale_date = request.data.get('sale_date')
+            products = request.data.get('products')
+            payment = request.data.get('payment')
 
-            if user.user_type == 'fpo':
-                try:
-                    fpo_profile = FPO.objects.get(user=user)
-                    print(f"Fpo Profile : {fpo_profile}")
-                except FPO.DoesNotExist:
-                    return Response({'error': 'Fpo details not found'}, status=status.HTTP_404_NOT_FOUND)
-
-                is_farmer = FarmerProfile.objects.filter(mobile=mobile_no, fpo_name=fpo_profile).exists()
-                print(f"Buyer is Farmer or Not: {is_farmer}")
-                discount = request.data.get('discount', 0) if is_farmer else 0
-                customer_data = {'buyer_name': buyer_name, 'mobile_no': mobile_no, 'address': address, 'fk_fpo': fpo_profile.id}
-                print(f"Customer data: {customer_data}")
-                customer_serializer = FPOCustomerDetailsSerializer(data=customer_data)
-
-                if customer_serializer.is_valid():
-                    customer = customer_serializer.save()
-                    print(f"Customer Serializer: {customer_serializer.validated_data}")
-                else:
-                    return Response(customer_serializer.errors, status=400)
-
-            elif user.user_type == "supplier":
-                try:
-                    supplier_profile = Supplier.objects.get(user=user)
-                    print(f"Supplier Profile: {supplier_profile}")
-                except Supplier.DoesNotExist:
-                    return Response({'error': 'Supplier details not found'}, status=status.HTTP_404_NOT_FOUND)
-                
-                customer_data = {'buyer_name': buyer_name, 'mobile_no': mobile_no, 'address': address, 'fk_supplier_id': supplier_profile.id}
-                customer_serializer = SupplierCustomerDetailsSerializer(data=customer_data)
-                if customer_serializer.is_valid():
-                    customer = customer_serializer.save()
-                    print(f"Customer Data: {customer_serializer.validated_data}")
-                else:
-                    return Response(customer_serializer.errors, status=400)
-
-            else:
-                return Response({'error': 'Invalid user type'}, status=400)
+            if not all([sale_date, payment, products, mobile_no]):
+                return Response({'error': 'Required fields are missing'}, status=status.HTTP_400_BAD_REQUEST)
 
             with transaction.atomic():
-                sale_responses, total_price = [], 0
-                for product_data in products:
-                    quantity, inventory_id = product_data.get('Quantity'), product_data.get('inventory_id')
-                    inventory = InventoryDetails.objects.filter(id=inventory_id).first()
-                    if not inventory or inventory.stock < quantity:
-                        return Response({'error': f'Inventory issue for product id: {inventory_id}'}, status=404 if not inventory else 400)
-            
-                    product = inventory.fk_product
-                    productprice = ProductPrices.objects.filter(fk_product=product).first()
-                    if not productprice:
-                        return Response({'error': f'Pricing issue for product: {product.productName}'}, status=400)
-            
-                    price = productprice.final_price_unit
-                    amount = price * quantity * (1 - discount / 100) if user.user_type == 'fpo' else price * quantity
-                    print(f"Price: {price}, Amount: {amount}")
+                if user.user_type == 'fpo':
+                    customer, profile = self.handle_fpo_user(user, buyer_name, mobile_no, address)
+                elif user.user_type == 'supplier':
+                    customer, profile = self.handle_supplier_user(user, buyer_name, mobile_no, address)
+                else:
+                    return Response({'error': 'Invalid user type'}, status=status.HTTP_400_BAD_REQUEST)
 
-                    inventory.stock -= quantity
-                    inventory.save()
-                    product.quantity -= quantity
-                    product.save()
-
-                    sale_data = {
-                        'fk_invent': inventory.id, 
-                        'amount': amount, 
-                        'sales_date': sale_date,
-                        'final_price': price, 
-                        'payment_method': payment, 
-                        'fk_custom': customer.id
-                    }
-                    sale_serializer = ProductSaleSerializer(data=sale_data)
-                    if sale_serializer.is_valid():
-                        sale = sale_serializer.save()
-                        sale_responses.append(sale_serializer.data)
-                    else:
-                        return Response(sale_serializer.errors, status=400)
-
-                    total_price += amount
-
-                    if user.user_type == 'fpo':
-                        sales_record_data = {
-                            'name': buyer_name, 
-                            'quantity': quantity, 
-                            'total_amount': amount, 
-                            'fk_fpo': fpo_profile.id,
-                            'sales_date': sale_date, 
-                            'product_name': product.productName,
-                            'category': inventory.fk_product.fk_productype.product_type,
-                            'fk_fposupplier_id': inventory.fk_fposupplier.id
-                        }
-                        sales_record_serializer = FPOSalesRecordItemSerializer(data=sales_record_data)
-                    else:
-                        sales_record_data = {
-                            'name': buyer_name, 
-                            'quantity': quantity, 
-                            'total_amount': amount, 
-                            'fk_supplier': supplier_profile,
-                            'sales_date': sale_date, 
-                            'product_name': product.productName,
-                            'category': inventory.fk_product.fk_productype.product_type,
-                            'fk_inputsupplier_id': inventory.fk_inputsupplier.id
-                        }
-                        sales_record_serializer = SupplierSalesRecordItemSerializer(data=sales_record_data)
-
-                    if sales_record_serializer.is_valid():
-                        sales_record_serializer.save()
-                    else:
-                        return Response(sales_record_serializer.errors, status=400)
+                sale_responses, total_price = self.process_products(products, customer, sale_date, payment, profile, user.user_type)
 
             return Response({
                 "message": "Sales processed successfully", 
                 "sales": sale_responses,
                 "total_price": total_price
-            }, status=201)
+            }, status=status.HTTP_201_CREATED)
 
         except Exception as e:
-            error_message = str(e)
-            trace = traceback.format_exc()
             return Response({
                 "status": "error",
-                "message": "An unexpected error occurred",
-                "error_message": error_message,
-                "traceback": trace
+                "message": str(e)
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    def handle_fpo_user(self, user, buyer_name, mobile_no, address):
+        fpo_profile = get_object_or_404(FPO, user=user)
+        is_farmer = FarmerProfile.objects.filter(mobile=mobile_no, fpo_name=fpo_profile).exists()
+        discount = self.request.data.get('discount', 0) if is_farmer else 0
+        
+        customer_data = {
+            'buyer_name': buyer_name,
+            'mobile_no': mobile_no,
+            'address': address,
+            'fk_fpo': fpo_profile.id
+        }
+        customer_serializer = FPOCustomerDetailsSerializer(data=customer_data)
+        customer_serializer.is_valid(raise_exception=True)
+        customer = customer_serializer.save()
+        
+        return customer, fpo_profile
+
+    def handle_supplier_user(self, user, buyer_name, mobile_no, address):
+        supplier_profile = get_object_or_404(Supplier, user=user)
+        
+        customer_data = {
+            'buyer_name': buyer_name,
+            'mobile_no': mobile_no,
+            'address': address,
+            'fk_supplier': supplier_profile.id
+        }
+        customer_serializer = SupplierCustomerDetailsSerializer(data=customer_data)
+        customer_serializer.is_valid(raise_exception=True)
+        customer = customer_serializer.save()
+        
+        return customer, supplier_profile
+
+    def process_products(self, products, customer, sale_date, payment, profile, user_type):
+        sale_responses = []
+        total_price = 0
+
+        for product_data in products:
+            quantity = product_data.get('Quantity')
+            inventory_id = product_data.get('inventory_id')
+            
+            inventory = get_object_or_404(InventoryDetails, id=inventory_id)
+            if inventory.stock < quantity:
+                raise ValueError(f'Insufficient stock for product id: {inventory_id}')
+
+            product = inventory.fk_product
+            productprice = get_object_or_404(ProductPrices, fk_product=product)
+
+            price = productprice.final_price_unit
+            amount = price * quantity * (1 - self.request.data.get('discount', 0) / 100) if user_type == 'fpo' else price * quantity
+
+            inventory.stock -= quantity
+            inventory.save()
+            product.quantity -= quantity
+            product.save()
+
+            sale_data = {
+                'fk_invent': inventory.id,
+                'amount': amount,
+                'sales_date': sale_date,
+                'final_price': price,
+                'payment_method': payment,
+                'fk_custom': customer.id
+            }
+            sale_serializer = ProductSaleSerializer(data=sale_data)
+            sale_serializer.is_valid(raise_exception=True)
+            sale = sale_serializer.save()
+            sale_responses.append(sale_serializer.data)
+
+            total_price += amount
+
+            self.create_sales_record(user_type, customer.buyer_name, quantity, amount, profile, sale_date, product, inventory)
+
+        return sale_responses, total_price
+
+    def create_sales_record(self, user_type, buyer_name, quantity, amount, profile, sale_date, product, inventory):
+        common_data = {
+            'name': buyer_name,
+            'quantity': quantity,
+            'total_amount': amount,
+            'sales_date': sale_date,
+            'product_name': product.productName,
+            'category': inventory.fk_product.fk_productype.product_type,
+        }
+
+        if user_type == 'fpo':
+            sales_record_data = {
+                **common_data,
+                'fk_fpo': profile.id,
+                'fk_productype': inventory.fk_productype.id,
+                'fk_fposupplier': inventory.fk_fposupplier.id
+            }
+            sales_record_serializer = FPOSalesRecordItemSerializer(data=sales_record_data)
+            #print(f"Sales Record Serializer :{sales_record_serializer.data}")
+        else:
+            sales_record_data = {
+                **common_data,
+                'fk_supplier': profile.id,
+                'fk_inputsupplier_id': inventory.fk_inputsupplier.id
+            }
+            sales_record_serializer = SupplierSalesRecordItemSerializer(data=sales_record_data)
+
+        sales_record_serializer.is_valid(raise_exception=True)
+        sales_record_serializer.save()
     
     def get(self, request,format=None):
         user=request.user
@@ -1634,7 +1649,7 @@ class MonthlySales(APIView):
                     print(f"FPO Profile: {fpo_profile}")
                 except FPO.DoesNotExist:
                     return Response({'error': 'FPO details not found'}, status=status.HTTP_404_NOT_FOUND)
-                sales = SalesRecordItem.objects.filter(fk_fpo=fpo_profile,category=filter_type)
+                sales = SalesRecordItem.objects.filter(fk_fpo=fpo_profile,fk_productype_id=filter_type)
                 sales_serializer=MonthlySalesSerializer(sales,many=True)
                 return Response(sales_serializer.data, status=status.HTTP_200_OK)
             elif user.user_type =='supplier':
@@ -1643,7 +1658,7 @@ class MonthlySales(APIView):
                     print(f"Supplier Profile: {supplier_profile}")
                 except Supplier.DoesNotExist:
                     return Response({'error': 'Supplier details not found'}, status=status.HTTP_404_NOT_FOUND)
-                sales = SalesRecordItem.objects.filter(fk_supplier=supplier_profile, category=filter_type)
+                sales = SalesRecordItem.objects.filter(fk_supplier=supplier_profile,fk_productype_id=filter_type)
                 sales_serializer=MonthlySalesSerializer(sales,many=True)
                 return Response(sales_serializer.data, status=status.HTTP_200_OK)
             else:
@@ -1668,7 +1683,7 @@ class TotalSales(APIView):
                     fpo_profile=FPO.objects.get(user=user)
                 except FPO.DoesNotExist:
                     return Response({'error': 'FPO details not found'}, status=status.HTTP_404_NOT_FOUND)
-                sales = SalesRecordItem.objects.filter(fk_fpo=fpo_profile, category=filter_type)
+                sales = SalesRecordItem.objects.filter(fk_fpo=fpo_profile,fk_productype_id=filter_type)
                 print(f"Sales: {sales}")
                 sales_count = sales.count()
                 print(f"Sales: {sales_count}")
@@ -1678,7 +1693,7 @@ class TotalSales(APIView):
                     try:
                         product_price = ProductPrices.objects.filter(
                         fk_fpo=fpo_profile,
-                        fk_product__fk_productype__product_type=filter_type,
+                        fk_product__fk_productype_id=filter_type,
                         fk_product__selling_status=sales_status
                     )
                         print(f"Product price:{product_price}")
@@ -1736,7 +1751,7 @@ class CheckCustomerisFarmerornot(APIView):
                 except FPO.DoesNotExist:
                     return Response({'error': 'FPO details not found'}, status=status.HTTP_404_NOT_FOUND)
                 try:
-                    farmer_status=FarmerProfile.objects.get(mobile=mobile_no,fk_fpo=fpo_profile).exists()
+                    farmer_status=FarmerProfile.objects.get(mobile=mobile_no,fpo_name=fpo_profile).exists()
                     return Response({'message': 'Farmer mobile number is associated with the FPO', 'associated': True},
                                 status=status.HTTP_200_OK)
                 except FarmerProfile.DoesNotExist:
@@ -1756,7 +1771,7 @@ class CheckBuyerisFarmerorNot(APIView):
         user=request.user
         print(f"User is {user}")
         try:
-            filter_type=request.query_parms.get('filter_type')
+            filter_type=request.query_params.get('filter_type')
             if not filter_type:
                 return Response({'error': 'Filter type must be provided'}, status=400)
             if user.user_type=='fpo':
@@ -1779,7 +1794,7 @@ class CheckBuyerisFarmerorNot(APIView):
                 elif filter_type == "all":
                     farmers = FarmerProfile.objects.filter(fpo_name=fpo_profile).distinct()
                     print(f"Farmer Object:{farmers}")
-                    unique_customers = {(farmer['name'], farmer['mobile']): {'buyer_name': farmer['name'], 'mobile_no': farmer['mobile_no']} for farmer in farmers.values('name', 'mobile_no')}
+                    unique_customers = {(farmer['name'], farmer['mobile']): {'buyer_name': farmer['name'], 'mobile_no': farmer['mobile']} for farmer in farmers.values('name', 'mobile')}
 
                 elif filter_type == "inactive":
                     farmers = FarmerProfile.objects.filter(fpo_name=fpo_profile)
@@ -1793,7 +1808,7 @@ class CheckBuyerisFarmerorNot(APIView):
                 else:
                     return Response({'message': 'Invalid filter_type'}, status=400)
 
-                return Response({'farmers': list(unique_customers.values()), 'count': len(unique_customers)}, status=200)
+                return Response({'suceess':'ok','farmers': list(unique_customers.values()), 'count': len(unique_customers)}, status=200)
 
             else:
                 return Response({'error': 'User type not recognized'}, status=status.HTTP_400_BAD_REQUEST)
@@ -1849,3 +1864,83 @@ class GetFPOCropVariety(APIView):
                 return Response({'message':'Only Farmer can access this data'}, status=403)
         except Exception as e:
             return Response({'error': 'An error occurred.', 'details': str(e), 'traceback': traceback.format_exc()}, status=500)
+        
+#################################-----------------------GOvt Schemes-----------------##########
+class GetallFPOGovtSchemes(APIView):
+    permission_classes=[IsAuthenticated]
+    def get(self, request):
+        user=request.user
+        print(f"User is {user.user_type}")
+        try:
+            filter_type = request.query_params.get('filter_type', 'all')
+            user_language = request.query_params.get('language','1')
+            if not filter_type:
+                return Response({'status': 'error','message': 'Filter type is required'}, status=status.HTTP_400_BAD_REQUEST)
+            if user.user_type=="fpo":
+                try:
+                    farmer_profile=FPO.objects.get(user=user)
+                    print(f"FPO :{farmer_profile}")
+                except FarmerProfile.DoesNotExist:
+                    return Response({'status': 'error','message': 'FPO not found for this user'}, status=status.HTTP_404_NOT_FOUND)
+                schemes = GovtSchemes.objects.all()
+                if user_language:
+                    schemes = schemes.filter(fk_language_id=user_language)
+                if filter_type == 'central':
+                    schemes = schemes.filter(scheme_by__in=['Central Schemes', 'केन्द्र सरकार की योजनाएं'])
+                elif filter_type == 'state':
+                    schemes = schemes.filter(scheme_by__in=['State Schemes', 'राज्य सरकार की योजनाएं'])
+                serializer = GovtSchemesSerializer(schemes, many=True)
+                return Response({'status': 'success', 'schemes': serializer.data}, status=status.HTTP_200_OK)
+            else:
+                return Response({'status': 'error','message': 'Only fPO can view government schemes'}, status=status.HTTP_403_FORBIDDEN)
+        except Exception as e:
+            error_message = str(e)
+            trace = traceback.format_exc()
+            return Response(
+                {
+                    "status": "error",
+                    "message": "An unexpected error occurred",
+                    "error_message": error_message,
+                    "traceback": trace
+                },
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+class FPOGovtSchemesbyID(APIView):
+    permission_classes=[IsAuthenticated]
+    def get(self, request):
+        user=request.user
+        print(f"User is {user.user_type}")
+        try:
+            govt_id =request.query_params.get ('govt_id')
+            user_language = request.query_params.get('language','1')
+            
+            if not govt_id:
+                return Response({'message': 'govt_id is required'}, status=status.HTTP_400_BAD_REQUEST)
+            
+            if user.user_type=="fpo":
+                try:
+                    farmer_profile=FPO.objects.get(user=user)
+                    print(f"Farmer profile :{farmer_profile}")
+                except FPO.DoesNotExist:
+                    return Response({'status': 'error','message': 'Fpo not found for this user'}, status=status.HTTP_404_NOT_FOUND)
+                govt_schemes = GovtSchemes.objects.filter(id=govt_id, fk_language_id=user_language)
+                if not govt_schemes.exists():
+                    return Response({'message': 'No schemes found'}, status=status.HTTP_404_NOT_FOUND)
+            
+                serializer = GovtSchemesSerializer(govt_schemes, many=True)
+                return Response({'message': 'Successful', 'schemes': serializer.data}, status=status.HTTP_200_OK)
+            else:
+                return Response({'status': 'error','message': 'Only farmer can view government schemes by ID'}, status=status.HTTP_403_FORBIDDEN)
+        
+        except Exception as e:
+            error_message = str(e)
+            trace = traceback.format_exc()
+            return Response(
+                {
+                    "status": "error",
+                    "message": "An unexpected error occurred",
+                    "error_message": error_message,
+                    "traceback": trace
+                },
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )   

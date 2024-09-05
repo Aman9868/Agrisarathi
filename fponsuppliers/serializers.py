@@ -2,7 +2,7 @@
 from rest_framework import serializers
 from rest_framework_simplejwt.tokens import RefreshToken,TokenError
 from .models import *
-from farmers.models import FarmerProfile,CropMapper,CropVariety
+from farmers.models import FarmerProfile,CropMapper,CropVariety,GovtSchemes
 from .managers import *
 from rest_framework.pagination import LimitOffsetPagination
 from rest_framework.pagination import PageNumberPagination
@@ -201,42 +201,6 @@ class FPOProductDetailFilterSerializer(serializers.ModelSerializer):
             }
             for price in prices
         ]
-#############################-------------------------------------SingleProduct Serializer Supplier------------------------#####
-class SupplierProductDetailsSerializer(serializers.ModelSerializer):
-    product_info = serializers.SerializerMethodField()
-    prices_info = serializers.SerializerMethodField()
-    class Meta:
-        model = ProductDetails
-        fields = ['product_info', 'prices_info']
-    def get_product_info(self, obj):
-        return {
-            "product_id": obj.id,
-            "product_name": obj.productName,
-            "product_description": obj.productDescription,
-            "fk_product_type_id": obj.fk_productype_id,
-            "manufacturer_name": obj.manufacturerName,
-            "measurement_type": obj.measurement_type,
-            "measurement_unit": obj.measurement_unit,
-            "quantity": obj.quantity,
-            "composition": obj.composition,
-            "selling_status": obj.selling_status,
-            "category": obj.Category,
-            "supplier_id": obj.fk_supplier.id if obj.fk_supplier else None
-        }
-
-    def get_prices_info(self, obj):
-        supplier_id = self.context['supplier_id']
-        prices = obj.productprices_set.filter(fk_supplier_id=supplier_id)  
-        return [
-            {
-                "price_id": price.id,
-                "purchase_price": price.purchase_price,
-                "unit_price": price.unit_price,
-                "discount": price.discount,
-                "final_price_unit": price.final_price_unit
-            }
-            for price in prices
-        ]
 #######-----
 class SupplierProductFilterDetailsSerializer(serializers.ModelSerializer):
     supplier_id = serializers.IntegerField(source='fk_supplier.id', read_only=True)
@@ -264,33 +228,45 @@ class SupplierProductFilterDetailsSerializer(serializers.ModelSerializer):
             }
             for price in prices
         ]
+
 ######################------------------------------FPO/Supplier Purchase Records--------------------------###################
 class FPOSuppliersSerializer(serializers.ModelSerializer):
-    products = serializers.SerializerMethodField()
+    supplier_id=serializers.IntegerField(source='id')
+    product_type=serializers.CharField(source='fk_productype.product_type')
+    product_name=serializers.SerializerMethodField()
     class Meta:
         model=FPOSuppliers
         fields = [
-            'id', 'party_name', 'party_mobileno', 'party_company', 
-            'total_amount', 'unit_price', 'party_gst', 'fk_productype', 
-            'quantity', 'products'
+            'supplier_id', 'party_name', 'party_mobileno', 'party_company', 
+            'total_amount', 'unit_price', 'party_gst', 
+            'quantity','product_type','product_name',
         ]
-    def get_products(self, obj):
+    def get_product_name(self, obj):
         fpo_id = self.context['fpo_id']
-        products = ProductDetails.objects.filter(fk_fposupplier=obj, fk_fpo_id=fpo_id)
-        return FPOProductDetailsSerializer(products, many=True, context={'fpo_id': fpo_id}).data
-class SupplierSupplySerializer(serializers.ModelSerializer):
-    data=SupplierProductDetailsSerializer(many=True, read_only=True, source='supplierproductdetails_set')
+        product_price = ProductDetails.objects.filter(fk_fpo_id=fpo_id).first()
+        return product_price.productName if product_price else None
+    
+    
+
+class ThirdPartySuppliersSerializer(serializers.ModelSerializer):
+    supplier_id=serializers.IntegerField(source='id')
+    product_type=serializers.CharField(source='fk_productype.product_type')
+    product_name=serializers.SerializerMethodField()
     class Meta:
         model=InputSuppliers
         fields = [
-            'id', 'party_name', 'party_mobileno', 'party_company', 
-            'total_amount', 'unit_price', 'party_gst', 'fk_productype', 
-            'quantity', 'products',
+            'supplier_id', 'party_name', 'party_mobileno', 'party_company', 
+            'total_amount', 'unit_price', 'party_gst', 
+            'quantity','product_type','product_name',
         ]
     def get_products(self, obj):
         supplier_id = self.context['supplier_id']
-        products = ProductDetails.objects.filter(fk_inputsupplier=obj, fk_supplier_id=supplier_id)
-        return SupplierProductDetailsSerializer(products, many=True, context={'supplier_id': supplier_id}).data
+        product_price = ProductDetails.objects.filter(fk_supplier_id=supplier_id).first()
+        return product_price.productName if product_price else None
+        
+    
+
+
 
 
 ######################-------------------------------Getall Product FPO/Suppliers---------------###################
@@ -323,7 +299,7 @@ class FPOProductDetailSerializer(serializers.ModelSerializer):
         try:
             product_price = ProductPrices.objects.filter(fk_product=obj.fk_product).first()
             print(f"Product price:{product_price}")
-            return product_price.unit_price if product_price else None
+            return product_price.final_price_unit if product_price else None
         except ProductPrices.DoesNotExist:
             return None
     
@@ -373,14 +349,15 @@ class FPOSalesRecordItemSerializer(serializers.ModelSerializer):
     salesrecord_id=serializers.IntegerField(source='id',read_only=True)
     class Meta:
         model = SalesRecordItem
-        fields = ['salesrecord_id','name', 'quantity', 'total_amount', 'fk_fpo', 'sales_date', 'product_name', 'category', 'fk_fposupplier_id',
+        fields = ['salesrecord_id','name', 'quantity', 'total_amount', 'fk_fpo', 'sales_date', 'product_name', 'category', 'fk_fposupplier',
+                  'fk_productype',
                   ]
 class SupplierSalesRecordItemSerializer(serializers.ModelSerializer):
     salesrecord_id=serializers.IntegerField(source='id',read_only=True)
     class Meta:
         model = SalesRecordItem
         fields = ['salesrecord_id','name', 'quantity', 'total_amount','sales_date', 'product_name', 'category', 
-                  'fk_supplier','fk_inputsupplier_id']
+                  'fk_supplier','fk_inputsupplier']
 class MonthlySalesSerializer(serializers.ModelSerializer):
     salesrecord_id=serializers.IntegerField(source='id')
     class Meta:
@@ -434,7 +411,12 @@ class GetallSalesPagination(PageNumberPagination):
     page_size = 10  
     page_size_query_param = 'page_size'
     max_page_size = 100 
-
+#########################-----------------------Get Purchase Records---------------------------############
+class GetallPurchasePagination(PageNumberPagination):
+    page_size = 10  
+    page_size_query_param = 'page_size'
+    max_page_size = 100 
+#############################---------------------------Get all cropsp-------------###########
 class CropMapperSerializer(serializers.ModelSerializer):
     crop_id = serializers.IntegerField(source='id')
     name = serializers.CharField(source='eng_crop.crop_name', read_only=True)
@@ -449,3 +431,11 @@ class CropVarietySerializer(serializers.ModelSerializer):
     class Meta:
         model = CropVariety
         fields = ['variety_id', 'name']
+
+class GovtSchemesSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = GovtSchemes
+        fields = ['id', 'scheme_name', 'details', 'benefits', 'elgibility', 'application_process', 'document_require', 
+                  'scheme_by', 'ministry_name', 'applicationform_link', 'reference', 'scheme_image']
+        
+
