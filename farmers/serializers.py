@@ -46,11 +46,14 @@ class FarmerLandAddressSerializer(serializers.ModelSerializer):
     crop_id = serializers.IntegerField(source='fk_crops.id', read_only=True)
     filter_id = serializers.IntegerField(source='fk_croptype.id', read_only=True)
     district = serializers.SerializerMethodField()
+    eng_district=serializers.CharField(source='fk_district.eng_district', read_only=True)
     crop = serializers.SerializerMethodField()
+    state= serializers.SerializerMethodField()
     crop_images=serializers.SerializerMethodField()
     class Meta:
         model = FarmerLandAddress
-        fields = ['id', 'land_area', 'address', 'state', 'district', 'tehsil', 'crop','crop_images','crop_id','filter_id']
+        fields = ['id', 'land_area', 'address', 'state', 'district', 'tehsil', 'crop','crop_images','crop_id','filter_id',
+                  'eng_district']
     def get_crop_images(self, obj):
         crop_images = CropImages.objects.filter(fk_cropmaster=obj.fk_crops)
         return [image.crop_image.url for image in crop_images]
@@ -73,6 +76,14 @@ class FarmerLandAddressSerializer(serializers.ModelSerializer):
                 return obj.fk_district.eng_district if obj.fk_district.eng_district else None
             elif user_language == 2:  
                 return obj.fk_district.hin_district if obj.fk_district.hin_district else None
+        return None
+    def get_state(self, obj):
+        user_language = obj.fk_farmer.fk_language.id
+        if obj.fk_state:
+            if user_language == 1: 
+                return obj.fk_state.eng_state if obj.fk_state.eng_state else None
+            elif user_language == 2:  
+                return obj.fk_state.hin_state if obj.fk_state.hin_state else None
         return None
 ########################----------------------------Crop Type Serializers------------------###########
 class POPCropTypeSerializer(serializers.ModelSerializer):

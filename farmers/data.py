@@ -155,7 +155,7 @@ def store_otp(identifier, otp):
 def AddState(request):
     try:
         if request.method=="POST":
-            excel_file = r'/home/Agrisarathi/agrisarthi/staticfiles/States Data.xlsx'
+            excel_file = r'/home/Agrisarathi/agrisarthi/staticfiles/districts.xlsx'
             data_xl = pd.read_excel(excel_file)
             for index, row in data_xl.iterrows():
                 StateMaster.objects.create(
@@ -172,10 +172,9 @@ def AddState(request):
 def AddDistrict(request):
     try:
         if request.method=="POST":
-            user_language=request.POST.get('user_language')
             state_id=request.POST.get('state_id')
-            excel_file = r'/home/Agrisarathi/agrisarthi/staticfiles/UpDistricts.xlsx'
-            data_xl = pd.read_excel(excel_file,sheet_name='en')
+            excel_file = r'/home/Agrisarathi/agrisarthi/staticfiles/districts.xlsx'
+            data_xl = pd.read_excel(excel_file,sheet_name='himachal')
             for index, row in data_xl.iterrows():
                 DistrictMaster.objects.create(
                     fk_state_id=state_id,
