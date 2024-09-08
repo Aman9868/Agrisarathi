@@ -193,6 +193,7 @@ class FarmerProfile(models.Model):
     coins = models.IntegerField(null=True, blank=True, default=0)
     ip_address = models.GenericIPAddressField(null=True, blank=True)
     is_active = models.BooleanField(default=True)
+    sms_status = models.BooleanField(default=True)
     is_deleted = models.BooleanField(default=False)
     badgecolor = models.ImageField(upload_to="farmer_badges/", null=True, blank=True)
     BADGE_CHOICES = {

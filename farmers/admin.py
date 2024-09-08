@@ -284,7 +284,7 @@ class SoilAdminCharges(admin.ModelAdmin):
 ##################################----------------------Spices POP------------------------##################
 @admin.register(SpicesPop)
 class SpicesPopAdmin(admin.ModelAdmin):
-    list_display = ('stages','description','stage_number','getcrop_type', 'get_combined_crop_name','getlanguage','preference')
+    list_display = ('stages','description','stage_number', 'get_combined_crop_name','getlanguage','preference')
     list_filter = ('stages','fk_language')
     search_fields = ('stages', 'description')
     def get_combined_crop_name(self, obj):
@@ -296,8 +296,6 @@ class SpicesPopAdmin(admin.ModelAdmin):
         return obj.fk_language.language if obj.fk_language else None
     getlanguage.short_description='Language'
 
-    def getcrop_type(self,obj):
-        return obj.fk_croptype.name if obj.fk_croptype else None
 
 ##################-----------------------
 
