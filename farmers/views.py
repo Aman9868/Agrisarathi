@@ -2261,10 +2261,9 @@ class VegetableStagesAPIView(APIView):
     @transaction.atomic
     def post(self, request, format=None):
         user = request.user
-        crop_id = request.data.get('crop_id')
         farm_id = request.data.get('land_id')
         filter_type = request.data.get('filter_type')
-        required_fields = ['crop_id', 'filter_type']
+        required_fields = ['land_id', 'filter_type']
         for field in required_fields:
             if not request.data.get(field):
                 return Response({'message': f'Missing or empty field: {field}'}, status=status.HTTP_400_BAD_REQUEST)
@@ -2279,7 +2278,10 @@ class VegetableStagesAPIView(APIView):
                 farm = None
                 if farm_id:
                     try:
-                        farm = FarmerLandAddress.objects.get(id=farm_id, fk_farmer=farmer, fk_crops__id=crop_id)
+                        farm = FarmerLandAddress.objects.get(id=farm_id, fk_farmer=farmer)
+                        print(f"Farm Id is :{farm}")
+                        crop_id=farm.fk_crops.id
+                        print(f"Crops Id is :{crop_id}")
                     except FarmerLandAddress.DoesNotExist:
                         return Response({'error': 'Invalid farmer land ID'}, status=status.HTTP_404_NOT_FOUND)
 
@@ -2531,13 +2533,12 @@ class MarkVegetableStageCompleteAPIView(APIView):
     @transaction.atomic
     def post(self, request, format=None):
         user = request.user
-        crop_id = request.data.get('crop_id')
         farm_id = request.data.get('land_id')
         filter_type = request.data.get('filter_type')
         preference_number = request.data.get('preference_number')
         submit_task = request.FILES.get('submit_task')
 
-        required_fields = ['crop_id', 'filter_type', 'preference_number']
+        required_fields = ['land_id', 'filter_type', 'preference_number']
         for field in required_fields:
             if not request.data.get(field):
                 return Response({'message': f'Missing or empty field: {field}'}, status=status.HTTP_400_BAD_REQUEST)
@@ -2554,7 +2555,9 @@ class MarkVegetableStageCompleteAPIView(APIView):
                 farm = None
                 if farm_id:
                     try:
-                        farm = FarmerLandAddress.objects.get(id=farm_id, fk_farmer=farmer, fk_crops__id=crop_id)
+                        farm = FarmerLandAddress.objects.get(id=farm_id, fk_farmer=farmer)
+                        crop_id=farm.fk_crops.id
+                        print(f"Crops Id is :{crop_id}")
                     except FarmerLandAddress.DoesNotExist:
                         return Response({'error': 'Invalid farmer land ID'}, status=status.HTTP_404_NOT_FOUND)
 
@@ -2715,13 +2718,12 @@ class VegetableProgressAPIView(APIView):
     def get(self, request, format=None):
         user = request.user
         farm_id = request.query_params.get('land_id')
-        crops_data = request.data.get('crops')  # Access the crops data directly from the request body
+        crops_data = request.data.get('crops')  
 
         if not crops_data:
             return Response({'message': 'Missing crops data'}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
-            # Assume the crops_data is already parsed JSON from request.data
             crops = crops_data
         except (TypeError, ValueError):
             return Response({'message': 'Invalid crops data format'}, status=status.HTTP_400_BAD_REQUEST)
@@ -2735,9 +2737,15 @@ class VegetableProgressAPIView(APIView):
                     return Response({'message': 'Farmer Not Found'}, status=status.HTTP_404_NOT_FOUND)
 
                 farm = None
+                crop_id = None
                 if farm_id:
                     try:
                         farm = FarmerLandAddress.objects.get(id=farm_id, fk_farmer=farmer)
+                        if farm.fk_crops:
+                            crop_id = farm.fk_crops.id
+                            print(f"Crops Id is :{crop_id}")
+                        else:
+                            return Response({'error': 'No crops associated with the given farmer land'}, status=status.HTTP_404_NOT_FOUND)
                     except FarmerLandAddress.DoesNotExist:
                         return Response({'error': 'Invalid farmer land ID'}, status=status.HTTP_404_NOT_FOUND)
 
@@ -2745,7 +2753,6 @@ class VegetableProgressAPIView(APIView):
                 crops_with_no_data = []
 
                 for crop_data in crops:
-                    crop_id = crop_data.get('crop_id')
                     filter_type = crop_data.get('filter_type')
 
                     if not crop_id or not filter_type:
@@ -2842,7 +2849,7 @@ class GetVegetablePopNotification(APIView):
             responses = []
             for crop in crops:
                 crop_id = crop.get('crop_id')
-                land_id = crop.get('farm_id')
+                land_id = crop.get('land_id')
                 filter_type = crop.get('filter_type')
                 weather_conditions = crop.get('weather_conditions', [])
 
@@ -2858,7 +2865,9 @@ class GetVegetablePopNotification(APIView):
                 farm=None
                 if land_id:
                     try:
-                        farm = FarmerLandAddress.objects.get(id=land_id, fk_farmer=farmer, fk_crops__id=crop_id)
+                        farm = FarmerLandAddress.objects.get(id=land_id, fk_farmer=farmer)
+                        crop_id=farm.fk_crops.id
+                        print(f"Crops Id is :{crop_id}")
                     except FarmerLandAddress.DoesNotExist:
                         return Response({'error': 'Invalid farmer land ID'}, status=status.HTTP_404_NOT_FOUND)
 
