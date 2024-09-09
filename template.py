@@ -2,6 +2,7 @@ import os
 from pathlib import Path
 list_of_files=[
     ".github/workflows/ci.yaml",
+    ".github/workflows/python-publish.yaml",
     "test/__init__.py",
     "test/unit/__init__.py",
     "news_scraper/__init__.py",
