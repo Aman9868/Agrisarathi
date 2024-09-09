@@ -137,9 +137,10 @@ class VerifyOTP(APIView):
                 print(f"User is {user}")
 
             otp_record = OTPVerification.objects.filter(
-                            Q(mobile=mobile if login_type == 'mobile' else None) | 
-                            Q(email=email if login_type == 'email' else None),
-                                otp=otp).order_by('-expires_at').first()
+                otp=otp,
+                mobile=mobile if login_type == 'mobile' else None,
+                email=email if login_type == 'email' else None
+            ).order_by('-expires_at').first()
             print(f"OTP Record is :{otp_record}")
 
             if otp_record is None or otp_record.expires_at < timezone.now():
