@@ -140,14 +140,35 @@ def register_new_user(request, **kwargs):
 ###########--------------------To store sende otp in backend
 def store_otp(identifier, otp):
     expires_at = timezone.now() + timedelta(minutes=5)
-    otp_record, created = OTPVerification.objects.update_or_create(
-        mobile=identifier,
-        defaults={
-            'otp': otp,
-            'expires_at': expires_at
-        }
-    )
+    
+    if isinstance(identifier, str):
+        is_email = re.match(r"[^@]+@[^@]+\.[^@]+", identifier)
+        is_mobile = re.match(r"^\+?\d{10,15}$", identifier)
+    else:
+        is_email = False
+        is_mobile = isinstance(identifier, int) and 1000000000 <= identifier <= 9999999999
+    
+    if is_email:
+        otp_record, created = OTPVerification.objects.update_or_create(
+            email=identifier,
+            defaults={
+                'otp': otp,
+                'expires_at': expires_at
+            }
+        )
+    elif is_mobile:
+        otp_record, created = OTPVerification.objects.update_or_create(
+            mobile=identifier,
+            defaults={
+                'otp': otp,
+                'expires_at': expires_at
+            }
+        )
+    else:
+        raise ValueError("Invalid identifier. Must be a valid email or mobile number.")
     return otp_record
+
+
 
 
 ######################----------------------Addd State------------------------------------########################

@@ -4,6 +4,7 @@ from rest_framework_simplejwt.tokens import RefreshToken,TokenError
 from fponsuppliers.models import *
 from .models import *
 from rest_framework.pagination import LimitOffsetPagination
+from django.db import transaction
 
 ######################----------------------------------------Farmer Serialzier--------------------------###########
 class FarmerRegistrationSerializer(serializers.ModelSerializer):
