@@ -91,7 +91,7 @@ class SupplierProfileSerializer(serializers.ModelSerializer):
   supplier_id=serializers.IntegerField(source='id')
   #district=serializers.SerializerMethodField()
   class Meta:
-    model = FPO
+    model = Supplier
     fields = ['supplier_id', 'mobile', 'supplier_name','state']
   def get_state(self,obj):
         return obj.fk_state.state if obj.fk_state else None

@@ -705,7 +705,8 @@ class ProductDetailsAddGetDelUpdate(APIView):
                 fk_product=product,
                 stock=request.data.get('quantity', 0),
                 fk_inputsupplier=supplier,
-                fk_supplier=supplier_info
+                fk_supplier=supplier_info,
+                fk_productype_id=producttype
                  )
                 return Response({'message': 'Product created & Added successfully by Supplier!'})
             else:
