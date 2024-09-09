@@ -193,6 +193,7 @@ class FarmerProfile(models.Model):
     coins = models.IntegerField(null=True, blank=True, default=0)
     ip_address = models.GenericIPAddressField(null=True, blank=True)
     is_active = models.BooleanField(default=True)
+    sms_status = models.BooleanField(default=True)
     is_deleted = models.BooleanField(default=False)
     badgecolor = models.ImageField(upload_to="farmer_badges/", null=True, blank=True)
     BADGE_CHOICES = {
@@ -218,6 +219,7 @@ class FarmerProfile(models.Model):
         self.save()
 class OTPVerification(models.Model):
     mobile = models.CharField(null=True, blank=True, max_length=10, validators=[validate_mobile_no], unique=True)
+    email = models.EmailField(max_length=255, null=True, blank=True)
     otp = models.CharField(max_length=6)
     created_at = models.DateTimeField(auto_now_add=True)
     expires_at = models.DateTimeField()

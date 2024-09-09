@@ -20,6 +20,7 @@ import pandas as pd
 from .serializers import *
 from .models import *
 from .data import *
+from django.db import IntegrityError
 import random
 import requests
 import json
@@ -57,6 +58,7 @@ class FarmerLogin(APIView):
                 print(f"Is existing Farmer:{is_existing_user}")
                 if user:
                     send_otp_via_email(email, otp)
+                    store_otp(email, otp)
                     return Response({
                         'message': f"OTP sent successfully to {user.email}",
                         'otp': otp,
@@ -64,6 +66,7 @@ class FarmerLogin(APIView):
                     }, status=status.HTTP_200_OK)
                 else:
                     send_otp_via_email(email, otp)
+                    store_otp(email, otp)
                     return Response({
                         'message': f"OTP sent successfully to {email}",
                         'otp': otp,
@@ -134,15 +137,17 @@ class VerifyOTP(APIView):
                 print(f"User is {user}")
 
             otp_record = OTPVerification.objects.filter(
-                mobile=mobile if login_type == 'mobile' else None,
-                otp=otp
-            ).order_by('-expires_at').first()
-            print(f"OTP record: {otp_record}")
+                            Q(mobile=mobile if login_type == 'mobile' else None) | 
+                            Q(email=email if login_type == 'email' else None),
+                                otp=otp).order_by('-expires_at').first()
+            print(f"OTP Record is :{otp_record}")
 
             if otp_record is None or otp_record.expires_at < timezone.now():
                 return Response({'error': 'Invalid or expired OTP'}, status=status.HTTP_400_BAD_REQUEST)
-
+            is_existing_user = False
             if user is None:
+                if not user_language:
+                    return Response({'error': 'User language is required'}, status=status.HTTP_400_BAD_REQUEST)
                 user_data = {
                     'email': email if login_type == 'email' else None,
                     'mobile': mobile if login_type == 'mobile' else None,
@@ -161,15 +166,21 @@ class VerifyOTP(APIView):
                     return Response({'error': 'Failed to create user'}, status=status.HTTP_400_BAD_REQUEST)
             else:
                 is_existing_user = FarmerProfile.objects.filter(user=user).exists()
-                farmer=FarmerProfile.objects.get(user=user)
-                print(f"Farmer Record :{farmer}")
+                if is_existing_user:
+                    farmer_profile = FarmerProfile.objects.get(user=user)
+                    user_language = farmer_profile.fk_language.id
+                    print(f"User Language is :{user_language}")
+                    print(f"Farmer Record :{farmer_profile}")
                 
 
             if user is None:
                 return Response({'error': 'User not found or created'}, status=status.HTTP_400_BAD_REQUEST)
 
             with transaction.atomic():
-                farmer_profile, created = FarmerProfile.objects.get_or_create(user=user,fk_language_id=user_language)
+                farmer_profile, created = FarmerProfile.objects.update_or_create(
+                    user=user,
+                    defaults={'fk_language_id': user_language}
+                )
                 print(f"Farmer Record Created :{farmer_profile}")
                 is_land = FarmerLandAddress.objects.filter(fk_farmer=farmer_profile).exists()
                 print(f"Land in Record :{is_land}")
@@ -211,6 +222,7 @@ class SendEmailVerification(APIView):
 
         try:
             user = CustomUser.objects.filter(email=email).first()
+            print(f"USER IS :{user}")
             if user is None:
                 return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
             try:
@@ -218,11 +230,11 @@ class SendEmailVerification(APIView):
                 print(f"Farmer profile{farmer_profile}")
             except FarmerProfile.DoesNotExist:
                 return Response({'status':'error','message':'Farmer not Found'})
-            otp = random.randint(1000, 9999)
+            otp = random.randint(100000, 999999)
             print(f"Verification attempt with email: {email}")
             print(f"\n Otp is {otp}")
             send_otp_via_email(email, otp)
-            store_otp(user, otp)
+            store_otp(email, otp)
             return Response({
                 'message': f"OTP sent successfully to {email}",
             }, status=status.HTTP_200_OK)
@@ -264,15 +276,17 @@ class VerifyEmail(APIView):
                 user.email_verified=True
                 user.save()
                 farmer_profile.email_verified=True
+                farmer_profile.sms_status=False
                 farmer_profile.save()
-                otp_record = OTPVerification.objects.filter(user=user, otp=otp).order_by('-expires_at').first()
+                otp_record = OTPVerification.objects.filter(email=email,otp=otp).order_by('-expires_at').first()
                 if otp_record is None:
                     return Response({'error': 'Invalid OTP'}, status=status.HTTP_400_BAD_REQUEST)
                 if otp_record.expires_at < timezone.now():
                     return Response({'error': 'OTP has expired'}, status=status.HTTP_400_BAD_REQUEST)
                 otp_record.delete() 
                 return Response({
-                   'message': 'Email verified successfully'
+                   'message': 'Email verified successfully',
+                   'sms_status':farmer_profile.sms_status
                 }, status=status.HTTP_200_OK)
             else:
                 return Response({'error': 'User type is not farmer'}, status=status.HTTP_400_BAD_REQUEST)
@@ -742,7 +756,7 @@ class FarmerDetailsGetUpdate(APIView):
                     farmer_profile=FarmerProfile.objects.get(user=user)
                 except FarmerProfile.DoesNotExist:
                     return Response({'status':'error','message':'Farmer not Found'})
-                farmer_data = ['name', 'fk_language_id','email']
+                farmer_data = ['name', 'fk_language_id','email','sms_status']
                 for field in farmer_data:
                     if field in data:
                         setattr(farmer_profile, field, data[field])
