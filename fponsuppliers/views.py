@@ -907,6 +907,9 @@ class ProductDetailsAddGetDelUpdate(APIView):
                 serializer = FPOProductDetailFilterSerializer(products, many=True, context={'fpo_id': fpo_profile.id})
                 return Response({'data':serializer.data}, status=status.HTTP_200_OK)
             elif user.user_type =='supplier':
+                product_id = request.query_params.get('product_id')
+                if not product_id:
+                    return Response({'message': 'Product id must be required'}, status=404)
                 try:
                     supplier_profile = Supplier.objects.get(user=user)
                     print(f"Supplier Profile :{supplier_profile}")
