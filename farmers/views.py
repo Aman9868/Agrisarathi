@@ -2882,8 +2882,7 @@ class GetVegetablePopNotification(APIView):
 
                 if not preference_completion:
                     responses.append({
-                    'crop_id': crop_id,
-                    'message': 'All preferences are completed or not found'
+                    'results':[]
                 })
                     continue
 
@@ -2906,7 +2905,6 @@ class GetVegetablePopNotification(APIView):
                     })
                 else:
                     responses.append({
-                    'crop_id': int(crop_id),
                     'message': 'No notification found for the current weather conditions and preference',
                 })
 
