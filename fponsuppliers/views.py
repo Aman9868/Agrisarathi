@@ -672,8 +672,7 @@ class ProductDetailsAddGetDelUpdate(APIView):
                 'Category':request.data.get('Category'),
                 'quantity':request.data.get('quantity'),
                 'fk_productype_id': producttype,
-                'fk_supplier': supplier_info,
-                'expiry_date': request.data.get('expiry_date',' '),
+                'expiry_date': request.data.get('expiry_date',None),
                 'manufacturerName': request.data.get('manufacturerName',' '),
                             }
                 product = ProductDetails.objects.create(**product_data)
