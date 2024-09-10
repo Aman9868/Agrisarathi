@@ -960,13 +960,16 @@ class GetProductDetailsByFPOSupplier(APIView):
                 try:
                     supplier_profile=Supplier.objects.get(user=user)
                 except Supplier.DoesNotExist:
-                    return Response({'error': 'FPO details not found'}, status=status.HTTP_404_NOT_FOUND)
+                    return Response({'error': 'Supplier details not found'}, status=status.HTTP_404_NOT_FOUND)
                 products = ProductDetails.objects.filter(fk_productype_id=productype_id,fk_supplier=supplier_profile)
                 print(f"Product ARE :{products}")
                 paginator=GetallProductPagination()
                 result_page = paginator.paginate_queryset(products, request)
                 serializer = SupplierProductFilterDetailsSerializer(result_page, many=True, context={'supplier_id': supplier_profile.id})
-                return Response(serializer.data, status=status.HTTP_200_OK)
+                return paginator.get_paginated_response({
+                        'status': 'success',
+                        'data': serializer.data,
+                    })
             else:
                 return Response({'error': 'Invalid User Type'}, status=status.HTTP_403_FORBIDDEN)
 
