@@ -1219,7 +1219,8 @@ class PurchaseInfo(APIView):
                 if not suppliers.exists():
                     return Response({'message': 'No suppliers found'}, status=status.HTTP_404_NOT_FOUND)
                 paginator=GetallPurchasePagination()
-                serializer = ThirdPartySuppliersSerializer(suppliers, many=True, context={'fk_supplier_id': supplier_profile.id})
+                result_page = paginator.paginate_queryset(suppliers, request)
+                serializer = ThirdPartySuppliersSerializer(suppliers, many=True, context={'supplier_id': supplier_profile.id})
                 return paginator.get_paginated_response({
                         'status': 'success',
                         'data': serializer.data,
