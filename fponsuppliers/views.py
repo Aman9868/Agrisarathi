@@ -1219,7 +1219,10 @@ class PurchaseInfo(APIView):
                 if not suppliers.exists():
                     return Response({'message': 'No suppliers found'}, status=status.HTTP_404_NOT_FOUND)
                 serializer = ThirdPartySuppliersSerializer(suppliers, many=True, context={'fk_supplier_id': supplier_profile.id})
-                return Response({"message": "success", 'supplier_details': serializer.data}, status=status.HTTP_200_OK)
+                return paginator.get_paginated_response({
+                        'status': 'success',
+                        'data': serializer.data,
+                    })
             else:
                 return Response({'message': 'Invalid user type'}, status=403)
         except Exception as e:
