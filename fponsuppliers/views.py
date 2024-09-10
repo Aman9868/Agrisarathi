@@ -672,7 +672,7 @@ class ProductDetailsAddGetDelUpdate(APIView):
                 'Category':request.data.get('Category'),
                 'quantity':request.data.get('quantity'),
                 'fk_productype_id': producttype,
-                'fk_fpo': fpo_profile,
+                'fk_supplier': supplier_info,
                 'expiry_date': request.data.get('expiry_date',' '),
                 'manufacturerName': request.data.get('manufacturerName',' '),
                             }
@@ -913,7 +913,7 @@ class ProductDetailsAddGetDelUpdate(APIView):
                     print(f"Supplier Profile :{supplier_profile}")
                 except Supplier.DoesNotExist:
                     return Response({'error': 'Supplier details not found'}, status=status.HTTP_404_NOT_FOUND)
-                products = ProductDetails.objects.filter(fk_fpo=fpo_profile, is_deleted=False)
+                products = ProductDetails.objects.filter(fk_supplier=supplier_profile, is_deleted=False)
                 if product_id:
                     products = products.filter(id=product_id)
 
@@ -962,7 +962,7 @@ class GetProductDetailsByFPOSupplier(APIView):
                     supplier_profile=Supplier.objects.get(user=user)
                 except Supplier.DoesNotExist:
                     return Response({'error': 'FPO details not found'}, status=status.HTTP_404_NOT_FOUND)
-                products = ProductDetails.objects.filter(fk_productype__product_type_id=productype_id,fk_fpo=fpo_profile)
+                products = ProductDetails.objects.filter(fk_productype__product_type_id=productype_id,fk_supplier=supplier_profile)
                 print(f"Product ARE :{products}")
                 paginator=GetallProductPagination()
                 result_page = paginator.paginate_queryset(products, request)
