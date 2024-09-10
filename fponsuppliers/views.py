@@ -920,7 +920,7 @@ class ProductDetailsAddGetDelUpdate(APIView):
                     products = products.filter(id=product_id)
 
                 serializer = SupplierProductFilterDetailsSerializer(products, many=True, context={'supplier_id': supplier_profile.id})
-                return Response(serializer.data, status=status.HTTP_200_OK)
+                return Response({'data':serializer.data}, status=status.HTTP_200_OK)
                           
         except Exception as e:
                 error_message = str(e)
