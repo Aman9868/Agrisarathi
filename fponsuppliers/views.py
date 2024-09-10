@@ -961,7 +961,7 @@ class GetProductDetailsByFPOSupplier(APIView):
                     supplier_profile=Supplier.objects.get(user=user)
                 except Supplier.DoesNotExist:
                     return Response({'error': 'FPO details not found'}, status=status.HTTP_404_NOT_FOUND)
-                products = ProductDetails.objects.filter(fk_productype__product_type_id=productype_id,fk_supplier=supplier_profile)
+                products = ProductDetails.objects.filter(fk_productype_id=productype_id,fk_supplier=supplier_profile)
                 print(f"Product ARE :{products}")
                 paginator=GetallProductPagination()
                 result_page = paginator.paginate_queryset(products, request)
