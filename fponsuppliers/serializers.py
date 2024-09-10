@@ -263,6 +263,11 @@ class ThirdPartySuppliersSerializer(serializers.ModelSerializer):
         supplier_id = self.context['supplier_id']
         product_price = ProductDetails.objects.filter(fk_supplier_id=supplier_id).first()
         return product_price.productName if product_price else None
+    
+    def get_product_name(self, obj):
+        supplier_id = self.context['supplier_id']
+        product_price = ProductDetails.objects.filter(fk_supplier_id=supplier_id).first()
+        return product_price.productName if product_price else None
         
     
 
