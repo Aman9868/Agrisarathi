@@ -1536,7 +1536,8 @@ class AddGetSales(APIView):
             sales_record_data = {
                 **common_data,
                 'fk_supplier': profile.id,
-                'fk_inputsupplier_id': inventory.fk_inputsupplier.id
+                'fk_productype': inventory.fk_productype.id,
+                'fk_inputsupplier': inventory.fk_inputsupplier.id
             }
             sales_record_serializer = SupplierSalesRecordItemSerializer(data=sales_record_data)
 
@@ -1624,17 +1625,19 @@ class InventoryInoutStock(APIView):
                 except Supplier.DoesNotExist:
                     return Response({'error': 'Supplier details not found'}, status=status.HTTP_404_NOT_FOUND)
                 if status=="instock":
-                    in_stock_filter = InventoryDetails.objects.filter(stock__gte=10, fk_supplier=supplier_profile, fk_product__selling_status=filter_type)
+                    in_stock_filter = InventoryDetails.objects.filter(stock__gte=10,fk_supplier=supplier_profile, fk_product__selling_status=filter_type)
+                    print(f"In Stock Filter: {in_stock_filter}")
                     instockls = format_inventory_details(in_stock_filter)
                     totalintsock = in_stock_filter.count()
                     return Response({"message": "Inventory In Stock fetched successfully", "inventory": instockls, "total_inventory": totalintsock},
-                                     status=status.HTTP_200_OK)
+                                     status=200)
                 elif status=="outstock":
-                    out_stock_filter = InventoryDetails.objects.filter(stock=0, fk_supplier=supplier_profile)
+                    out_stock_filter = InventoryDetails.objects.filter(stock=0,fk_supplier=supplier_profile)
+                    print(f"In Stock Filter: {out_stock_filter}")
                     outtockls = format_inventory_details(out_stock_filter)
                     totaloutsock = out_stock_filter.count()
                     return Response({"message": "Inventory Out Stock fetched successfully", "inventory": outtockls, "total_inventory": totaloutsock},
-                                     status=status.HTTP_200_OK)
+                                     status=200)
                 else:
                     return Response({'error': 'Invalid status provided'}, status=400)
             else:
@@ -1682,71 +1685,123 @@ class MonthlySales(APIView):
                                  "error_message": error_message,"traceback": trace},status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 ###################---------------------------Total Sales FPO n Suppliers---------------------###############################
 class TotalSales(APIView):
-    permission_classes=[IsAuthenticated]
-    def get(self,request,format=None):
-        user=request.user
-        print(f"User is:{user}")
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, format=None):
+        user = request.user
+        print(f"User is: {user}")
         try:
-            filter_type =request.query_params.get('filter_type')
-            sales_status=request.query_params.get('sales_status')
-            if user.user_type=='fpo':
+            filter_type = request.query_params.get('filter_type')
+            sales_status = request.query_params.get('sales_status')
+
+            if user.user_type == 'fpo':
                 try:
-                    fpo_profile=FPO.objects.get(user=user)
+                    fpo_profile = FPO.objects.get(user=user)
                 except FPO.DoesNotExist:
                     return Response({'error': 'FPO details not found'}, status=status.HTTP_404_NOT_FOUND)
-                sales = SalesRecordItem.objects.filter(fk_fpo=fpo_profile,fk_productype_id=filter_type)
+
+                sales = SalesRecordItem.objects.filter(
+                    fk_fpo=fpo_profile,
+                    fk_productype_id=filter_type,
+                    is_deleted=False
+                )
+                
+                if sales_status:
+                    sales = sales.filter(product_name__in=ProductDetails.objects.filter(
+                        selling_status=sales_status,
+                        fk_fpo=fpo_profile,
+                        fk_productype_id=filter_type
+                    ).values_list('productName', flat=True))
+
                 print(f"Sales: {sales}")
                 sales_count = sales.count()
-                print(f"Sales: {sales_count}")
+                print(f"Sales count: {sales_count}")
                 total_sales_amount = sales.aggregate(total=models.Sum('total_amount'))['total'] or 0
+                
                 total_profit = 0
                 for sale in sales:
                     try:
-                        product_price = ProductPrices.objects.filter(
-                        fk_fpo=fpo_profile,
-                        fk_product__fk_productype_id=filter_type,
-                        fk_product__selling_status=sales_status
-                    )
-                        print(f"Product price:{product_price}")
-                        for i in product_price:
-                            print(f"Final Price Unit:{i.final_price_unit}")
-                            print(f"Unit Price Unit:{i.unit_price}")
-                            profit_per_unit = i.final_price_unit - i.unit_price
+                        product = ProductDetails.objects.get(
+                            productName=sale.product_name,
+                            fk_fpo=fpo_profile,
+                            fk_productype_id=filter_type,
+                            selling_status=sales_status
+                        )
+                        if product.price is not None:
+                            sale_price = sale.total_amount / sale.quantity if sale.quantity else 0
+                            profit_per_unit = sale_price - product.price
                             total_profit += profit_per_unit * sale.quantity
-                    except ProductPrices.DoesNotExist:
+                    except ProductDetails.DoesNotExist:
                         continue
-                return Response({'sales_count': sales_count,
-                'total_sales_amount': round(total_sales_amount),
-                'total_profit': round(total_profit)},status=status.HTTP_200_OK)
-            elif user.user_type=='supplier':
+                    except Exception as e:
+                        print(f"Error calculating profit for sale {sale.id}: {str(e)}")
+
+                return Response({
+                    'sales_count': sales_count,
+                    'total_sales_amount': round(total_sales_amount, 2),
+                    'total_profit': round(total_profit, 2)
+                }, status=status.HTTP_200_OK)
+
+            elif user.user_type == 'supplier':
                 try:
-                    supplier_profile=Supplier.objects.get(user=user)
+                    supplier_profile = Supplier.objects.get(user=user)
                 except Supplier.DoesNotExist:
                     return Response({'error': 'Supplier details not found'}, status=status.HTTP_404_NOT_FOUND)
-                sales = SalesRecordItem.objects.filter(fk_supplier=supplier_profile, category=filter_type)
+
+                sales = SalesRecordItem.objects.filter(
+                    fk_supplier=supplier_profile,
+                    fk_productype_id=filter_type,
+                    is_deleted=False
+                )
+                
+                if sales_status:
+                    sales = sales.filter(product_name__in=ProductDetails.objects.filter(
+                        selling_status=sales_status,
+                        fk_supplier=supplier_profile,
+                        fk_productype_id=filter_type
+                    ).values_list('productName', flat=True))
+
                 print(f"Sales: {sales}")
                 sales_count = sales.count()
-                print(f"Sales: {sales_count}")
+                print(f"Sales count: {sales_count}")
                 total_sales_amount = sales.aggregate(total=models.Sum('total_amount'))['total'] or 0
+                
                 total_profit = 0
                 for sale in sales:
                     try:
-                        product_price = ProductPrices.objects.filter(
-                        fk_supplier=supplier_profile,
-                        fk_product__fk_productype__product_type=filter_type,
-                        fk_product__selling_status=sales_status)
-                    except ProductPrices.DoesNotExist:
+                        product = ProductDetails.objects.get(
+                            productName=sale.product_name,
+                            fk_supplier=supplier_profile,
+                            fk_productype_id=filter_type,
+                            selling_status=sales_status
+                        )
+                        if product.price is not None:
+                            sale_price = sale.total_amount / sale.quantity if sale.quantity else 0
+                            profit_per_unit = sale_price - product.price
+                            total_profit += profit_per_unit * sale.quantity
+                    except ProductDetails.DoesNotExist:
                         continue
-                return Response({'sales_count': sales_count,
-                'total_sales_amount': round(total_sales_amount),
-                'total_profit': round(total_profit)},status=status.HTTP_200_OK)
+                    except Exception as e:
+                        print(f"Error calculating profit for sale {sale.id}: {str(e)}")
+
+                return Response({
+                    'sales_count': sales_count,
+                    'total_sales_amount': round(total_sales_amount, 2),
+                    'total_profit': round(total_profit, 2)
+                }, status=status.HTTP_200_OK)
+
             else:
                 return Response({'error': 'User type not recognized'}, status=status.HTTP_400_BAD_REQUEST)
+
         except Exception as e:
-                error_message = str(e)
-                trace = traceback.format_exc()
-                return Response({"status": "error","message": "An unexpected error occurred",
-                                 "error_message": error_message,"traceback": trace},status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            error_message = str(e)
+            trace = traceback.format_exc()
+            return Response({
+                "status": "error",
+                "message": "An unexpected error occurred",
+                "error_message": error_message,
+                "traceback": trace
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 ####################---------------------------Check Cutsomer is Farmer or not-------------------################
 class CheckCustomerisFarmerornot(APIView):
     permission_classes=[IsAuthenticated]

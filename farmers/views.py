@@ -2715,125 +2715,93 @@ class MarkVegetableStageCompleteAPIView(APIView):
 class VegetableProgressAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
-    def get(self, request, format=None):
+    def post(self, request, format=None):
         user = request.user
-        farm_id = request.query_params.get('land_id')
-        crops_data = request.data.get('crops')  
+        crops_data = request.data.get('crops')
 
-        if not crops_data:
-            return Response({'message': 'Missing crops data'}, status=status.HTTP_400_BAD_REQUEST)
+        if not crops_data or not isinstance(crops_data, list):
+            return Response({'message': 'Invalid or missing crops data'}, status=status.HTTP_400_BAD_REQUEST)
 
-        try:
-            crops = crops_data
-        except (TypeError, ValueError):
-            return Response({'message': 'Invalid crops data format'}, status=status.HTTP_400_BAD_REQUEST)
+        if user.user_type != "farmer":
+            return Response({'message': 'User is not a farmer'}, status=status.HTTP_403_FORBIDDEN)
 
         try:
-            if user.user_type == "farmer":
-                try:
-                    farmer = FarmerProfile.objects.get(user=user)
-                    user_language = farmer.fk_language.id
-                except FarmerProfile.DoesNotExist:
-                    return Response({'message': 'Farmer Not Found'}, status=status.HTTP_404_NOT_FOUND)
+            farmer = FarmerProfile.objects.get(user=user)
+            user_language = farmer.fk_language.id
+        except FarmerProfile.DoesNotExist:
+            return Response({'message': 'Farmer Not Found'}, status=status.HTTP_404_NOT_FOUND)
 
-                farm = None
-                crop_id = None
-                if farm_id:
-                    try:
-                        farm = FarmerLandAddress.objects.get(id=farm_id, fk_farmer=farmer)
-                        if farm.fk_crops:
-                            crop_id = farm.fk_crops.id
-                            print(f"Crops Id is :{crop_id}")
-                        else:
-                            return Response({'error': 'No crops associated with the given farmer land'}, status=status.HTTP_404_NOT_FOUND)
-                    except FarmerLandAddress.DoesNotExist:
-                        return Response({'error': 'Invalid farmer land ID'}, status=status.HTTP_404_NOT_FOUND)
+        crops_progress = []
+        crops_with_no_data = []
 
-                crops_progress = []
-                crops_with_no_data = []
+        for crop_data in crops_data:
+            land_id = crop_data.get('land_id')
+            filter_type = crop_data.get('filter_type')
 
-                for crop_data in crops:
-                    filter_type = crop_data.get('filter_type')
+            if not land_id or not filter_type:
+                continue
 
-                    if not crop_id or not filter_type:
-                        continue
+            try:
+                farm = FarmerLandAddress.objects.get(id=land_id, fk_farmer=farmer)
+                crop_id = farm.fk_crops.id
+            except FarmerLandAddress.DoesNotExist:
+                crops_with_no_data.append({'land_id': land_id, 'filter_type': filter_type, 'error': 'Invalid farmer land ID'})
+                continue
 
-                    # Get total preferences for the crop
-                    total_preferences = VegetablePop.objects.filter(
-                        fk_crop_id=crop_id,
-                        fk_croptype_id=filter_type,
-                        fk_language=user_language
-                    ).values('preference').distinct().count()
+            total_preferences = VegetablePop.objects.filter(
+                fk_crop_id=crop_id,
+                fk_croptype_id=filter_type,
+                fk_language=user_language
+            ).values('preference').distinct().count()
+            crop_images=CropImages.objects.get(fk_cropmaster=crop_id)
+            crop_image=crop_images.crop_image.url
+            crop_mapper = crop_images.fk_cropmaster
+            if user_language == 1:
+                crop_name = crop_mapper.eng_crop.crop_name  
+            elif user_language == 2:
+                crop_name = crop_mapper.hin_crop.crop_name  
 
-                    if total_preferences == 0:
-                        crops_with_no_data.append({'crop_id': crop_id, 'filter_type': filter_type})
-                        continue
+            if total_preferences == 0:
+                crops_with_no_data.append({'land_id': land_id, 'filter_type': filter_type, 'error': 'No preferences found'})
+                continue
 
-                    # Get completed preferences
-                    completed_preferences = VegetablePreferenceCompletion.objects.filter(
-                        fk_farmer=farmer,
-                        fk_farmland=farm,
-                        fk_crop_id=crop_id,
-                        fk_croptype_id=filter_type,
-                        fk_language=user_language,
-                        is_completed=True
-                    ).count()
+            preference_progress = VegetablePreferenceCompletion.objects.filter(
+                fk_farmer=farmer,
+                fk_farmland=farm,
+                fk_croptype_id=filter_type,
+                fk_crop_id=crop_id,
+                fk_language=user_language
+            ).values('preference_number', 'progress', 'is_completed', 'name')
 
-                    # Calculate overall progress
-                    overall_progress = (completed_preferences / total_preferences) * 100
+            completed_preferences = sum(1 for pref in preference_progress if pref['is_completed'])
+            overall_progress = (completed_preferences / total_preferences) * 100
 
-                    # Get preference progress details
-                    preference_progress = VegetablePreferenceCompletion.objects.filter(
-                        fk_farmer=farmer,
-                        fk_farmland=farm,
-                        fk_croptype_id=filter_type,
-                        fk_crop_id=crop_id,
-                        fk_language=user_language
-                    ).values('preference_number', 'progress', 'is_completed', 'name')
+            crop_progress = {
+                'land_id': land_id,
+                'crop_id': crop_id,
+                'crop_name': crop_name,
+                'crop_image':crop_image,
+                'user_language': user_language,
+                'filter_type': filter_type,
+                'overall_progress': round(overall_progress, 2),
+                'total_preferences': total_preferences,
+                'completed_preferences': completed_preferences,
+                'preference_details': list(preference_progress)
+            }
 
-                    crop_progress = {
-                        'crop_id': crop_id,
-                        'user_language':user_language,
-                        'filter_type': filter_type,
-                        'overall_progress': round(overall_progress, 2),
-                        'total_preferences': total_preferences,
-                        'completed_preferences': completed_preferences,
-                        'preference_details': list(preference_progress)
-                    }
+            crops_progress.append(crop_progress)
 
-                    crops_progress.append(crop_progress)
+        response_data = {}
+        if crops_progress:
+            response_data['crops_progress'] = crops_progress
+        if crops_with_no_data:
+            response_data['crops_with_no_data'] = crops_with_no_data
 
-                response_data = {}
+        status_code = status.HTTP_200_OK if crops_progress else status.HTTP_404_NOT_FOUND
+        if crops_with_no_data:
+            status_code = status.HTTP_206_PARTIAL_CONTENT
 
-                if crops_progress:
-                    response_data['crops_progress'] = crops_progress
-
-                if crops_with_no_data:
-                    response_data['crops_with_no_data'] = crops_with_no_data
-
-                # Determine the appropriate status code based on the data available
-                status_code = status.HTTP_200_OK
-                if not crops_progress:
-                    status_code = status.HTTP_404_NOT_FOUND
-                elif crops_with_no_data:
-                    status_code = status.HTTP_206_PARTIAL_CONTENT
-
-                return Response(response_data, status=status_code)
-            else:
-                return Response({'message': 'User is not a farmer'}, status=status.HTTP_403_FORBIDDEN)
-
-        except Exception as e:
-            error_message = str(e)
-            trace = traceback.format_exc()
-            return Response(
-                {
-                    "status": "error",
-                    "message": "An unexpected error occurred",
-                    "error_message": error_message,
-                    "traceback": trace
-                },
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )   
+        return Response(response_data, status=status_code)
 #######-----------------Weather Notifcation
 class GetVegetablePopNotification(APIView):
     permission_classes = [IsAuthenticated]

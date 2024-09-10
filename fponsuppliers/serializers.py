@@ -365,7 +365,7 @@ class SupplierSalesRecordItemSerializer(serializers.ModelSerializer):
     class Meta:
         model = SalesRecordItem
         fields = ['salesrecord_id','name', 'quantity', 'total_amount','sales_date', 'product_name', 'category', 
-                  'fk_supplier','fk_inputsupplier']
+                  'fk_supplier','fk_inputsupplier','fk_productype',]
 class MonthlySalesSerializer(serializers.ModelSerializer):
     salesrecord_id=serializers.IntegerField(source='id')
     class Meta:
