@@ -92,6 +92,9 @@ urlpatterns = [
     ########################--------------FRUITS POP---------------------------################
     path('GetFruitsPopAPIView',GetFruitsPopAPIView.as_view(), name='GetFruitsPopAPIView'),
     
+    #########################---------------DUKANN-------------------------#############
+    path('GetallShops',GetallShops.as_view(), name='GetAllShops'),
+    
 
 
 

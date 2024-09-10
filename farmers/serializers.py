@@ -4,6 +4,7 @@ from rest_framework_simplejwt.tokens import RefreshToken,TokenError
 from fponsuppliers.models import *
 from .models import *
 from rest_framework.pagination import LimitOffsetPagination
+from rest_framework.pagination import PageNumberPagination
 from django.db import transaction
 
 ######################----------------------------------------Farmer Serialzier--------------------------###########
@@ -341,3 +342,10 @@ class SoilChargesSerializer(serializers.ModelSerializer):
     class Meta:
         model = SoilCharges
         fields = '__all__'
+        
+        
+###############################---------------------------Dukan all Shops----------------------#############
+class GetallShopPagination(PageNumberPagination):
+    page_size = 10  
+    page_size_query_param = 'page_size'
+    max_page_size = 100 

@@ -4254,6 +4254,46 @@ class GetFruitsWeatherNotifications(APIView):
                                                                        
         except Exception as e:
             return Response({'message': 'An error occurred', 'error': traceback.format_exc()}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+#################-------------------------------------------Agricultural Shops--------------------###########
+class GetallShops(APIView):
+    permission_classes = [IsAuthenticated]
+    def get(self, request):
+        user=request.user
+        print(f"User is :{user.user_type}")
+        filter_type=request.query_params.get("filter_type")
+        try:
+            if user.user_type=="farmer":
+                if filter_type == 'fpo':
+                    shops = ShopDetails.objects.filter(fk_fpo__isnull=False, is_deleted=False)
+                    print(f"Shops Data:{shops}")
+                    if not shops.exists():
+                        return Response({"error": "No FPO shops found"}, status=status.HTTP_404_NOT_FOUND)
+                elif filter_type == 'supplier':
+                    shops = ShopDetails.objects.filter(fk_supplier__isnull=False, is_deleted=False)
+                    if not shops.exists():
+                        return Response({"error": "No Supplier shops found"}, status=status.HTTP_404_NOT_FOUND)
+                else:
+                    shops = ShopDetails.objects.filter(is_deleted=False)
+                    if not shops.exists():
+                        return Response({"error": "No shops found"}, status=status.HTTP_404_NOT_FOUND)
+                serializer = ShopDetailSerializer(shops, many=True)
+                return Response(serializer.data, status=status.HTTP_200_OK) 
+            else:
+                return Response({"error": "Only farmers can access this endpoint"}, status=status.HTTP_403_FORBIDDEN)
+        except Exception as e:
+            error_message = str(e)
+            trace = traceback.format_exc()
+            return Response(
+                {
+                    "status": "error",
+                    "message": "An unexpected error occurred",
+                    "error_message": error_message,
+                    "traceback": trace
+                },
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+    
+
 #################################################----------------------SOIL TESTING BOOKINGS------------#########################
 
 #####-------SOIL Testing Shops In Branch/Collection----
