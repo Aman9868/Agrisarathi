@@ -2881,9 +2881,7 @@ class GetVegetablePopNotification(APIView):
                 print(f"Preferences Found:{preference_completion}")
 
                 if not preference_completion:
-                    responses.append({
-                    'results':[]
-                })
+                    responses.append([])
                     continue
 
                 preference_completion_serializer = VegetablePrefrencesSerializer(preference_completion)
