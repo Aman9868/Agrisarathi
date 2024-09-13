@@ -65,8 +65,8 @@ class FarmerLogin(APIView):
                         'is_existing_user': is_existing_user
                     }, status=status.HTTP_200_OK)
                 else:
-                    send_otp_via_email(email, otp)
-                    store_otp(email, otp)
+                    send_otp_via_email(email,otp)
+                    store_otp(email,otp)
                     return Response({
                         'message': f"OTP sent successfully to {email}",
                         'otp': otp,
@@ -79,15 +79,15 @@ class FarmerLogin(APIView):
                 is_existing_user = FarmerProfile.objects.filter(user=user).exists() if user else False
                 print(f"Is existing Farmer:{is_existing_user}")
                 if user:
-                    send_otpmobile(mobile, otp)
-                    store_otp(mobile, otp)
+                    sendmobile_otp(mobile,otp)
+                    store_otp(mobile,otp)
                     return Response({
                         'message': f"OTP sent successfully to {user.mobile}",
                         'otp': otp,
                         'is_existing_user': is_existing_user
                     }, status=status.HTTP_200_OK)
                 else:
-                    send_otpmobile(mobile, otp)
+                    sendmobile_otp(mobile,otp)
                     store_otp(mobile, otp)
                     return Response({
                         'message': f"OTP sent successfully to {mobile}",

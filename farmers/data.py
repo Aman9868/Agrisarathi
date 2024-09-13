@@ -57,39 +57,27 @@ def send_otp_via_email(email, otp):
     recipient_list = [email]
     send_mail(subject, message, from_email, recipient_list)
 
+
 #################---------------------For Sending Otps
-#################---------------------For Sending Otps
-def send_otpmobile(request,mobile):
-    try:
-        url = "https://control.msg91.com/api/v5/otp"
-        otp = random.randint(0,9999)
-        params = {
-        "template_id": "66b0844cd6fc0578d732ba62",  
-        "mobile": mobile,                  
-        "authkey": "427492AbnBhrYUWsn66b0810eP1",
-        "realTimeResponse": "1"
-        }
-        payload = {
-        "OTP": otp  
-        }
-        headers = {
-        'Content-Type': "application/json"
-        }
-        response = requests.post(url, params=params, headers=headers, data=json.dumps(payload))
-        print(otp)
-        return Response(response.json())
-    except Exception as e:
-            error_message = str(e)
-            trace = traceback.format_exc()
-            return Response(
-            {
-                "status": "error",
-                "message": "An unexpected error occurred",
-                "error_message": error_message,
-                "traceback": trace
-            },
-            status=status.HTTP_500_INTERNAL_SERVER_ERROR
-         )
+def sendmobile_otp(mobile,otp):
+    url="http://enterprise.smsgupshup.com/GatewayAPI/rest"
+    params={
+        "method": "SendMessage",
+        "send_to": mobile,
+        "msg": f"{otp} is OTP to Login on Agrisarathi.",
+        "msg_type": "TEXT",
+        "userid": "2000246092",  
+        "auth_scheme": "plain",
+        "password": "SaPGLOKKG",  
+        "v": "1.1",
+        "format": "text"
+        
+    }
+    response = requests.get(url, params=params)
+    if response.status_code == 200:
+        print("OTP sent successfully!")
+    else:
+        print(f"Failed to send OTP. Status code: {response.status_code}")
 
 ###############--------------------------Update user infro with mobile and email---------------#############
 def update_farmer_info(user, user_type, ip_address, mobile=None, is_new=False):
