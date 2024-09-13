@@ -51,6 +51,8 @@ class CustomUser(AbstractUser, PermissionsMixin):
     USERNAME_FIELD = 'username'
     REQUIRED_FIELDS = ['mobile']
     objects = CustomUserManager()
+    class Meta:
+        unique_together = ('mobile', 'user_type')
     def natural_key(self):
         return (self.mobile, self.user_type)
 

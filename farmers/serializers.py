@@ -214,9 +214,32 @@ class ShopSerializer(serializers.ModelSerializer):
 
 #####################-----------------------------------Disease Detection------------------------#############
 class UploadDiseaseSerializer(serializers.ModelSerializer):
+    disease_name=serializers.CharField(source='fk_disease.name', read_only=True)
+    serviceprovider=serializers.SerializerMethodField()
+    crop_id=serializers.IntegerField(source='fk_crop.id', read_only=True)
     class Meta:
         model = Upload_Disease
-        fields = '__all__'
+        fields = ['id','disease_name','uploaded_image','crop_id','serviceprovider','created_at']
+        
+    def get_serviceprovider(self, obj):
+        user_language = self.context.get('user_language')
+        if user_language == 1:  
+            return obj.fk_provider.eng_name if obj.fk_provider else None
+        elif user_language == 2:  
+            return obj.fk_provider.hin_name if obj.fk_provider else None
+        return None
+    
+class UploadDiseaseSerializerMore(serializers.ModelSerializer):
+    disease_name=serializers.CharField(source='fk_disease.name', read_only=True)
+    symtomps=serializers.CharField(source='fk_disease.symptom', read_only=True)
+    treatment_before=serializers.CharField(source='fk_disease.treatmentbefore', read_only=True)
+    teratment_field=serializers.CharField(source='fk_disease.treatmentfield', read_only=True)
+    crop_id=serializers.IntegerField(source='fk_crop.id', read_only=True)
+    treatment=serializers.CharField(source='fk_disease.treatment',read_only=True)
+    class Meta:
+        model = Upload_Disease
+        fields = ['id','disease_name','uploaded_image','crop_id','treatment_before','teratment_field','symtomps',
+                  'treatment']
 
 class DiseaseProductInfoSerializer(serializers.ModelSerializer):
     products = serializers.SerializerMethodField()
@@ -288,7 +311,7 @@ class CurrentNewsPagination(LimitOffsetPagination):
 ########-----------------------------------------CROP SUGGESTion-----------------------#################
 class SuggestedCropSerializer(serializers.ModelSerializer):
     crop_image = serializers.SerializerMethodField()
-    crop_name=serializers.CharField(source='fk_crop.crop_name', default=None)
+    crop_name=serializers.SerializerMethodField()
     crop_audio = serializers.SerializerMethodField()
 
     class Meta:
@@ -297,6 +320,16 @@ class SuggestedCropSerializer(serializers.ModelSerializer):
             'fk_crop', 'season', 'description', 'weather_temperature', 'cost_of_cultivation',
             'market_price', 'production', 'fk_language', 'crop_image', 'crop_audio','crop_name',
         ]
+    def get_crop_name(self, obj):
+        user_language = self.context.get('user_language')
+        print(f"Farmer language ID: {user_language}")
+        crop_name = None
+        if user_language == 1:  
+            crop_name = obj.fk_crop.eng_crop.crop_name if obj.fk_crop.eng_crop else None
+        elif user_language == 2: 
+            crop_name = obj.fk_crop.hin_crop.crop_name if obj.fk_crop.hin_crop else None
+        print(f"Returning crop name: {crop_name}")
+        return crop_name
 
     def get_crop_image(self, obj):
         crop_images = CropImages.objects.filter(fk_cropmaster=obj.fk_crop)
