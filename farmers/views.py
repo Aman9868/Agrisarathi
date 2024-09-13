@@ -477,7 +477,6 @@ class GetStateWiseDistrict(APIView):
 #################--------------------------------------------Service Providers-----------------------------########################
 class ServiceProviderList(APIView):
     permission_classes = [IsAuthenticated]
-
     def get(self, request):
         user = request.user
         print(f"User is {user.user_type}")
@@ -1432,7 +1431,7 @@ class GetSingleDiagnosisReport(APIView):
             first_disease = user_disease.first()
             disease = first_disease.fk_disease.name if first_disease.fk_disease else None
             cropid = first_disease.fk_crop.id if first_disease.fk_crop else None
-            disease_results = UploadDiseaseSerializer(user_disease, many=True).data
+            disease_results = UploadDiseaseSerializerMore(user_disease, many=True).data
             product_disease = DiseaseProductInfo.objects.filter(
                 fk_disease__name=disease,
                 fk_crop_id=cropid
@@ -1475,12 +1474,12 @@ class GetDiagnosisReport(APIView):
                 fk_user=farmer_profile,
                 fk_language_id=user_language,
                 is_deleted=False
-                ).select_related('fk_provider', 'fk_disease', 'fk_crop').order_by('-id')
+                ).order_by('-id')
                 print(f"User Diseases: {user_disease}")
 
             if not user_disease.exists():
                 return Response({'message': 'Record Not Found'}, status=status.HTTP_404_NOT_FOUND)
-            disease_details = UploadDiseaseSerializer(user_disease, many=True).data
+            disease_details = UploadDiseaseSerializer(user_disease, many=True,context={'user_language': user_language}).data
             return Response({'status': 'success', 'disease_details': disease_details})
 
         except Exception as e:
@@ -2138,7 +2137,7 @@ class CropSuggestion(APIView):
                 if not suggested_crop:
                     return Response({'message': 'No suggested crop found for the given crop and language'}, status=status.HTTP_404_NOT_FOUND)
 
-                serializer = SuggestedCropSerializer(suggested_crop)
+                serializer = SuggestedCropSerializer(suggested_crop,context={'user_language': user_language})
                 return Response({'crop_details': serializer.data}, status=status.HTTP_200_OK)
             else:
                 return Response({'message': 'Invalid user type'}, status=status.HTTP_403_FORBIDDEN)
