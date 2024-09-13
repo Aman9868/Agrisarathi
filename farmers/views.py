@@ -722,7 +722,8 @@ class FarmerAddGetallLandInfo(APIView):
                     land_address=FarmerLandAddress.objects.get(id=land_id,fk_farmer=farmer_profile)
                 except FarmerLandAddress.DoesNotExist:
                     return Response({'status':'error','message':'Land not Found'})
-                land_address_data = ['address', 'pincode', 'fk_state_id', 'fk_district_id', 'village', 'fk_crops_id', 'land_area', 'lat1', 'lat2', 'fk_variety_id', 'is_land']
+                land_address_data = ['address', 'pincode', 'fk_state_id', 'fk_district_id', 'village', 'fk_crops_id', 'land_area', 'lat1', 'lat2', 'fk_variety_id', 'is_land',
+                                     'sowing_date']
                 for field in land_address_data:
                     if field in data:
                         setattr(land_address, field, data[field])
