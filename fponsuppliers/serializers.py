@@ -345,27 +345,24 @@ class SupplierCustomerDetailsSerializer(serializers.ModelSerializer):
         fields = ['customer_id','buyer_name', 'mobile_no', 'address','fk_supplier']
 
 class ProductSaleSerializer(serializers.ModelSerializer):
-    sale_id=serializers.IntegerField(source='id',read_only=True)
-    product_name = serializers.CharField(source='fk_invent.fk_product.productName', read_only=True)
-    remaining_stock = serializers.IntegerField(source='fk_invent.stock', read_only=True)
-    
     class Meta:
         model = ProductSale
-        fields = ['sale_id', 'product_name', 'final_price', 'remaining_stock']
+        fields = ['id', 'fk_invent', 'fk_custom', 'amount', 'payment_method', 'sales_date', 'final_price']
+
 
 class FPOSalesRecordItemSerializer(serializers.ModelSerializer):
     salesrecord_id=serializers.IntegerField(source='id',read_only=True)
     class Meta:
         model = SalesRecordItem
         fields = ['salesrecord_id','name', 'quantity', 'total_amount', 'fk_fpo', 'sales_date', 'product_name', 'category', 'fk_fposupplier',
-                  'fk_productype',
+                  'fk_productype','fk_invent', 'fk_customer','payment_method',
                   ]
 class SupplierSalesRecordItemSerializer(serializers.ModelSerializer):
     salesrecord_id=serializers.IntegerField(source='id',read_only=True)
     class Meta:
         model = SalesRecordItem
         fields = ['salesrecord_id','name', 'quantity', 'total_amount','sales_date', 'product_name', 'category', 
-                  'fk_supplier','fk_inputsupplier','fk_productype',]
+                  'fk_supplier','fk_inputsupplier','fk_productype','fk_invent', 'fk_customer','payment_method',]
 class MonthlySalesSerializer(serializers.ModelSerializer):
     salesrecord_id=serializers.IntegerField(source='id')
     class Meta:

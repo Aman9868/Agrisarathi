@@ -4259,7 +4259,33 @@ class GetallShops(APIView):
                 },
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
-    
+##############################---------------------------- Get Single Shop Info----------------------###############
+class GetShopDetails(APIView):
+    permission_classes = [IsAuthenticated]
+    def get(self, request, shop_id):
+        user=request.user
+        print(f"User is :{user.user_type}")
+        try:
+            if user.user_type=="farmer":
+                shop = ShopDetails.objects.get(id=shop_id, is_deleted=False)
+                serializer = ShopDetailSerializer(shop)
+                return Response(serializer.data, status=status.HTTP_200_OK)
+            else:
+                return Response({"error": "Only farmers can access this endpoint"}, status=status.HTTP_403_FORBIDDEN)
+        except ShopDetails.DoesNotExist:
+            return Response({"error": "No shop found with this id"}, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            error_message = str(e)
+            trace = traceback.format_exc()
+            return Response(
+                {
+                    "status": "error",
+                    "message": "An unexpected error occurred",
+                    "error_message": error_message,
+                    "traceback": trace
+                },
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
 #################################################----------------------SOIL TESTING BOOKINGS------------#########################
 
