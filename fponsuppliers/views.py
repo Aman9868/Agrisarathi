@@ -29,16 +29,57 @@ def create_user_token(user, user_type):
         'refresh': str(refresh),
         'access': str(refresh.access_token),
     }
-####################-------------------------------------REST API's Login----------------###############
-class UserLogin(APIView):
+    
+#################--------------------------------------User Registration------------------########################
+class UserRegistration(APIView):
     permission_classes = [AllowAny]
-
     def post(self, request, format=None):
         user_type = request.data.get('user_type')
         mobile = request.data.get('mobile')
         password = request.data.get('password')
         ip_address = request.META.get('REMOTE_ADDR')
-        print(f"Login attempt with mobile: {mobile}, user_type: {user_type}, password: {password}, IP address: {ip_address}")
+        print(f"Registration attempt with mobile: {mobile}, user_type: {user_type}, password: {password}, IP address: {ip_address}")
+        try:
+            user=CustomUser.objects.filter(mobile=mobile,user_type=user_type).exists()
+            print(f"User is :{user}")
+            if user:
+                return Response({'error': 'User with this mobile number already exists'}, status=status.HTTP_400_BAD_REQUEST)
+            serializer = RegistrationSerializer(data=request.data)
+            #print(f"Serialized Data :{serializer.data}")
+            if serializer.is_valid():
+                user = serializer.save()
+                return Response({'message': 'User registered successfully'}, status=status.HTTP_201_CREATED)
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            error_message = str(e)
+            trace = traceback.format_exc()
+            return Response(
+                {
+                    "status": "error",
+                    "message": "An unexpected error occurred",
+                    "error_message": error_message,
+                    "traceback": trace
+                },
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+                
+
+                
+####################-------------------------------------REST API's Login----------------###############
+class UserLogin(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request, format=None):
+        serializer = LoginSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        mobile = serializer.validated_data['mobile']
+        password = serializer.validated_data['password']
+        user_type = serializer.validated_data['user_type']
+        ip_address = request.META.get('REMOTE_ADDR')
+        
+        print(f"Login attempt with mobile: {mobile}, user_type: {user_type}, IP address: {ip_address}")
 
         try:
             user = CustomUser.objects.filter(mobile=mobile, user_type=user_type).first()
@@ -53,18 +94,7 @@ class UserLogin(APIView):
                 else:
                     return Response({'error': 'Invalid Credentials'}, status=status.HTTP_401_UNAUTHORIZED)
             else:
-                # New user registration and login
-                serializer = LoginSerializer(data=request.data)
-                if serializer.is_valid():
-                    related_user = serializer.create_user(serializer.validated_data, user_type)
-                    tokens = create_user_token(related_user, user_type)
-                    self.update_user_info(related_user, user_type, ip_address, is_new=True)
-                    return Response({
-                        'message': 'User created and logged in successfully',
-                        'tokens': tokens
-                    }, status=status.HTTP_201_CREATED)
-                print(f"Registration failed with errors: {serializer.errors}")
-                return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+                return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
 
         except Exception as e:
             error_message = str(e)
@@ -72,7 +102,7 @@ class UserLogin(APIView):
             return Response(
                 {
                     "status": "error",
-                    "message": "An unexpected error occurred",
+                    "message": "An unexpected error occurred during login",
                     "error_message": error_message,
                     "traceback": trace
                 },
@@ -610,7 +640,7 @@ class ProductDetailsAddGetDelUpdate(APIView):
                 'productName': productname,
                 'productDescription': request.data.get('productDescription',' '),
                 'composition': request.data.get('composition',' '),
-                'measurement_type': request.data.get('measurement_type'),
+                'measurement_type_id': request.data.get('measurement_type'),
                 'measurement_unit':request.data.get('measurement_unit'),
                 'selling_status': request.data.get('selling_status'),
                 'Category':request.data.get('Category'),
@@ -1021,12 +1051,18 @@ class ADDProductDetailsCSV(APIView):
                         print(f"Fpo Profile : {fpo_profile}")
                     except FPO.DoesNotExist:
                         return Response({'error': 'FPO details not found'}, status=status.HTTP_404_NOT_FOUND)
-
+                    
+                    measurement_description = row.get('Measurement')
+                    measurement, created = ProductMeasurements.objects.get_or_create(
+                            description=measurement_description,
+                            defaults={'measurement_code': measurement_description[:100]}  
+                        )
+                    print(f"Measurement is :{measurement}")
                     product_data = {
                         'productName': productname,
                         'productDescription': row.get('ProductDescription', ' '),
                         'composition': row.get('composition', ' '),
-                        'measurement_type': row.get('Measurement'),
+                        'measurement_type': measurement,
                         'measurement_unit': row.get('MeasurementIn'),
                         'selling_status': row.get('Selling Status'),
                         'Category': row.get('Category'),
@@ -1085,12 +1121,18 @@ class ADDProductDetailsCSV(APIView):
                     except Supplier.DoesNotExist:
                         return Response({'error': 'Supplier details not found'}, status=status.HTTP_404_NOT_FOUND)
 
+                    measurement_description = row.get('Measurement')
+                    measurement, created = ProductMeasurements.objects.get_or_create(
+                            description=measurement_description,
+                            defaults={'measurement_code': measurement_description[:100]}  
+                        )
+                    print(f"Measurement is :{measurement}")
                     product_data = {
                         'productName': productname,
                         'productDescription': row.get('ProductDescription', ' '),
                         'composition': row.get('composition', ' '),
                         'measurement_type': row.get('Measurement'),
-                        'measurement_unit': row.get('MeasurementIn'),
+                        'measurement_type': measurement,
                         'selling_status': row.get('Selling Status'),
                         'Category': row.get('Category'),
                         'quantity': row.get('Quantity'),

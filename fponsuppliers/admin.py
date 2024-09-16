@@ -38,7 +38,7 @@ class BankBusinessDetailsAdmin(admin.ModelAdmin):
 ###################----------------------------------Admin Product and Supplier Details------------------------#################
 @admin.register(ProductDetails)
 class ProductDetailsAdmin(admin.ModelAdmin):
-    list_display = ('id', 'productName', 'Category', 'weight', 'price', 'manufacturerName', 'display_product_image',"measurement_type",
+    list_display = ('id', 'productName', 'Category', 'weight', 'price', 'manufacturerName', 'display_product_image',"get_measurement_type",
                     "quantity")
     list_filter = ('Category', 'manufacturerName')
     search_fields = ('productName', 'manufacturerName')
@@ -49,6 +49,8 @@ class ProductDetailsAdmin(admin.ModelAdmin):
         else:
             return '-'
     display_product_image.short_description = 'Product Image'
+    def get_measurement_type(self,obj):
+        return obj.measurement_type.description if obj.measurement_type else None
 
 ##########################----------------------------Input Suppliers------------------################
 @admin.register(InputSuppliers)
@@ -98,6 +100,11 @@ class ProductPricesAdmin(admin.ModelAdmin):
 @admin.register(ProductType)
 class ProductTypeAdmin(admin.ModelAdmin):
     list_display=('id','product_type')
+    
+################################-------------------------------Product Measuremnets---------------------------###########
+@admin.register(ProductMeasurements)
+class ProductMeasurementAdmin(admin.ModelAdmin):
+    list_display=('id','measurement_code','description','created_at','updated_at')
 ###################---------------------------------------------FPO Supplers-------------------------##############
 @admin.register(FPOSuppliers)
 class FPOSuppliersAdmin(admin.ModelAdmin):

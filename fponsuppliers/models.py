@@ -231,6 +231,14 @@ class InputSuppliers(models.Model):
     state=models.CharField(null=True,blank=True,max_length=100)
     district=models.CharField(null=True,blank=True,max_length=100)
     party_gst=models.CharField(null=True,blank=True,max_length=100)
+    
+#########################-------------------Product Measurements------------------#####################
+class ProductMeasurements(models.Model):
+    measurement_code=models.CharField(max_length=100,null=True,blank=True)
+    description=models.CharField(max_length=100,null=True,blank=True)
+    created_at=models.DateTimeField(auto_now=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    is_deleted = models.BooleanField(default=False)
 #####----------Product Information----------------------##################
 class ProductDetails(models.Model):
     productName = models.CharField(max_length=100, blank=True, null=True)
@@ -242,14 +250,7 @@ class ProductDetails(models.Model):
     manufacturing_date=models.DateField(null=True,blank=True)
     product_image = models.ImageField(upload_to='productimage/', blank=True, null=True)
     fk_serviceprovider=models.ForeignKey('farmers.Service_Provider',on_delete=models.CASCADE,blank=True,null=True)
-    units_cho=[
-    ('KG','KG'),
-    ('GM','GM'),
-    ('L','L'),
-    ('ML','ML'),
-    ('DOZEN','DOZEN'),
-    ]
-    measurement_type=models.CharField(max_length=100,null=True,blank=True,choices=units_cho,default="")
+    measurement_type=models.ForeignKey(ProductMeasurements,on_delete=models.CASCADE,blank=True,null=True)
     measurement_unit=models.IntegerField(null=True,blank=True)
     sellby_choice=[
         ("Pcs","PCS"),
@@ -394,4 +395,6 @@ class SalesRecordItem(models.Model):
     created_at=models.DateTimeField(auto_now=True)
     updated_at = models.DateTimeField(auto_now=True)
     is_deleted = models.BooleanField(default=False)
+    
+
 
