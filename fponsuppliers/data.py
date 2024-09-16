@@ -35,7 +35,7 @@ from datetime import timedelta
 def AddMeasurements(request):
     try:
         if request.method=="POST":
-            excel_file = r'/home/aman/AgrisarthiProject/agrisarthi/measurement.xlsx'
+            excel_file = r'/home/Agrisarathi/agrisarthi/staticfiles/measurement.xlsx'
             data_xl = pd.read_excel(excel_file)
             for index, row in data_xl.iterrows():
                 ProductMeasurements.objects.create(
