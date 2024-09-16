@@ -1,9 +1,11 @@
 from django.urls import path
 from .views import *
+from .data import *
 from rest_framework_simplejwt.views import (
     TokenRefreshView,
 )
 urlpatterns = [
+    path('UserRegistration',UserRegistration.as_view(),name='UserRegistration'),
     path('UserLogin',UserLogin.as_view(), name='UserLogin'),
     path('UserLogout',UserLogout.as_view(), name='UserLogout'),
     path('UserProfileView',UserProfileView.as_view(), name='UserProfileView'),
@@ -21,6 +23,8 @@ urlpatterns = [
     path('ProductDetailsAddGetDelUpdate',ProductDetailsAddGetDelUpdate.as_view(),name='ProductDetailsAddGetDelUpdate'),
     path('PurchaseInfo',PurchaseInfo.as_view(),name='PurchaseInfo'), 
     path('GetallProductsInfo',GetallProductsInfo.as_view(),name='GetallProductsInfo'),
+    path('AddMeasurements',AddMeasurements,name='AddMeasurements'),
+    path('GetMeasurements',GetMeasurements.as_view(),name='GetMeasurements'),
     path('InventorySection',InventorySection.as_view(),name='InventorySection'), # inventiry get/update
     path('AddGetSales',AddGetSales.as_view(),name='AddGetSales'), # add sales and get sales info
     path('InventoryInoutStock',InventoryInoutStock.as_view(),name='InventoryInoutStock'), # instock and oytstock

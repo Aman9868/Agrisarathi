@@ -14,26 +14,50 @@ class UserSerializer(serializers.ModelSerializer):
         extra_kwargs = {'password': {'write_only': True}}
 
 ######################----------------------------------------FPO--------------------------###########
-class LoginSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = CustomUser
-        fields = ['mobile','password','user_type'] 
-        extra_kwargs = {'password': {'write_only': True}}
+class RegistrationSerializer(serializers.Serializer):
+    mobile = serializers.CharField()
+    password = serializers.CharField(write_only=True)
+    user_type = serializers.ChoiceField(choices=['fpo', 'supplier'])
+    name = serializers.CharField(required=False)
 
-    def create_user(self, validated_data, user_type):
+    def create(self, validated_data):
+        user_type = validated_data['user_type']
+        name = validated_data.pop('name', None)
+
         user = CustomUser.objects.create_user(
             mobile=validated_data['mobile'],
             password=validated_data['password'],
-            user_type=validated_data['user_type']
+            user_type=user_type
         )
         if user_type == 'fpo':
-            FPO.objects.create(user=user, mobile=user.mobile,password=user.password)
+            if not name:
+                raise serializers.ValidationError({"name": "Name is required for FPO users."})
+            FPO.objects.create(user=user, mobile=user.mobile,fpo_name=name,password=user.password)
         elif user_type == 'supplier':
-            Supplier.objects.create(user=user, mobile=user.mobile,password=user.password)
+            if not name:
+                raise serializers.ValidationError({"name": "Name is required for Supplier users."})
+            Supplier.objects.create(user=user, mobile=user.mobile, name=name,password=user.password)
         else:
-            raise ValueError("Invalid user type")
+            user.delete()  
+            raise serializers.ValidationError({"user_type": "Invalid user type."})
+
         print(f"Created {user_type} user: {user}")
-        return user 
+        return user
+
+    def validate(self, data):
+        user_type = data.get('user_type')
+        name = data.get('name')
+        print(f"Validating {user_type} Validation Name: {name}")
+
+        if user_type in ['fpo', 'supplier'] and not name:
+            raise serializers.ValidationError({"name": f"Name is required for {user_type.upper()} users."})
+
+        return data
+    
+class LoginSerializer(serializers.Serializer):
+    mobile = serializers.CharField()
+    password = serializers.CharField(write_only=True)
+    user_type = serializers.ChoiceField(choices=['fpo', 'supplier'])
 #################----------------------------------FPO Profile Details----------------------##########################
 class FPOProfileSerializer(serializers.ModelSerializer):
   fpo_id=serializers.IntegerField(source='id')
@@ -178,6 +202,7 @@ class FPOProductDetailFilterSerializer(serializers.ModelSerializer):
     crop_name = serializers.CharField(source='fk_crops.crop_name', read_only=True)
     variety = serializers.CharField(source='fk_variety.variety', read_only=True)
     prices = serializers.SerializerMethodField()
+    measurement_type=serializers.CharField(source='measurement_type.description', read_only=True)
 
     class Meta:
         model = ProductDetails
@@ -204,6 +229,7 @@ class FPOProductDetailFilterSerializer(serializers.ModelSerializer):
 #######-----
 class SupplierProductFilterDetailsSerializer(serializers.ModelSerializer):
     supplier_id = serializers.IntegerField(source='fk_supplier.id', read_only=True)
+    measurement_type=serializers.CharField(source='measurement_type.description', read_only=True)
     prices = serializers.SerializerMethodField()
 
     class Meta:
@@ -444,3 +470,9 @@ class GovtSchemesSerializer(serializers.ModelSerializer):
                   'scheme_by', 'ministry_name', 'applicationform_link', 'reference', 'scheme_image']
         
 
+class ProductMeasurementsSerializer(serializers.ModelSerializer):
+    measurement_id = serializers.IntegerField(source='id')
+    class Meta:
+        model=ProductMeasurements
+        fields=['measurement_id','measurement_code','description']
+        
