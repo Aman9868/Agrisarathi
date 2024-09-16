@@ -372,8 +372,17 @@ class ProductSale(models.Model):
 class SalesRecordItem(models.Model):
     fk_fpo=models.ForeignKey(FPO,on_delete=models.CASCADE,null=True,blank=True)
     fk_supplier=models.ForeignKey(Supplier,on_delete=models.CASCADE,null=True,blank=True)
+    paymentchocie=[
+        ('Cash','Cash'),
+        ('Card','Card'),
+        ('Online','Online'),
+        ('Cheque','Cheque'),
+        ('Others','Others'),
+    ]
+    payment_method = models.CharField(max_length=100, choices=paymentchocie, null=True, blank=True)
     fk_fposupplier=models.ForeignKey(FPOSuppliers,on_delete=models.CASCADE,null=True,blank=True)
     fk_inputsupplier=models.ForeignKey(InputSuppliers,on_delete=models.CASCADE,null=True,blank=True)
+    fk_invent=models.ForeignKey(InventoryDetails,on_delete=models.CASCADE,null=True,blank=True)
     fk_customer=models.ForeignKey(CustomerDetails,on_delete=models.CASCADE,null=True,blank=True)
     fk_productype=models.ForeignKey(ProductType,on_delete=models.CASCADE,null=True,blank=True)
     category = models.CharField(max_length=100,null=True,blank=True)

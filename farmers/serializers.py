@@ -368,9 +368,10 @@ class CropMasterSerializer(serializers.ModelSerializer):
         fields = '__all__'
 #####################################-----------------------------SOIL Testing----------------####################
 class ShopDetailSerializer(serializers.ModelSerializer):
+    shop_id=serializers.IntegerField(source='id')
     class Meta:
         model = ShopDetails
-        fields = '__all__' 
+        fields = ['shop_id','shopName','shopContactNo','shopaddress','shop_opentime','shop_closetime','shopimage']
 class SoilChargesSerializer(serializers.ModelSerializer):
     class Meta:
         model = SoilCharges
