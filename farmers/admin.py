@@ -436,7 +436,7 @@ class DiseaseProductInfoAdmin(admin.ModelAdmin):
 @admin.register(CurrentNews)
 class CurrentNewsAdmin(admin.ModelAdmin):
     list_display = ('title', 'created_at', 'getlanguage')
-    list_filter = ('fk_language', 'created_at','source')
+    list_filter = ('fk_language', 'created_at','source','related_post')
     def getlanguage(self,obj):
         return obj.fk_language.language if obj.fk_language else None
     getlanguage.short_description='Language'

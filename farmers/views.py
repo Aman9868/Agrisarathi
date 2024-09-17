@@ -481,16 +481,19 @@ class ServiceProviderList(APIView):
         user = request.user
         print(f"User is {user.user_type}")
         try:
-            user_language = request.query_params.get('user_language')
             if user.user_type == 'farmer':
-                if user_language:
-                    service_providers = Service_Provider.objects.filter(is_deleted=False)
-                    serializer = ServiceProviderSerializer(
+                try:
+                    farmer_profile=FarmerProfile.objects.get(user=user)
+                    print(f"Farmer profile is {farmer_profile}")
+                    user_language=farmer_profile.fk_language.id
+                    print(f"Language is :{user_language}")
+                except FarmerProfile.DoesNotExist:
+                    return Response({'status': 'error', 'msg': 'No Farmer Data Found'}, status=status.HTTP_404_NOT_FOUND)
+                service_providers = Service_Provider.objects.filter(is_deleted=False)
+                serializer = ServiceProviderSerializer(
                         service_providers, many=True, context={'user_language': user_language}
                     )
-                    return Response({'status': 'success', 'data': serializer.data}, status=status.HTTP_200_OK)
-                else:
-                    return Response({"error": "user_language parameter is required"}, status=status.HTTP_400_BAD_REQUEST)
+                return Response({'status': 'success', 'data': serializer.data}, status=status.HTTP_200_OK)
             else:
                 return Response({'status': 'error', 'message': 'User type is not farmer'}, status=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
@@ -2497,7 +2500,8 @@ class VegetableStagesAPIView(APIView):
                         'stage_id': vege.id,
                         'stages': vege.stages,
                         'stage_name': vege.stage_name,
-                        "stage_audio": vege.audio.url if vege.audio else None, 
+                        "stage_audio": vege.audio.url if vege.audio else None,
+                        'stage_video': vege.video.url if vege.video else None, 
                         'sow_period': vege.sow_period,
                         'description': vege.description,
                         'stage_number': vege.stage_number,

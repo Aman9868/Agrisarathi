@@ -52,10 +52,11 @@ class FarmerLandAddressSerializer(serializers.ModelSerializer):
     crop = serializers.SerializerMethodField()
     state= serializers.SerializerMethodField()
     crop_images=serializers.SerializerMethodField()
+    preference = serializers.SerializerMethodField()
     class Meta:
         model = FarmerLandAddress
         fields = ['id', 'land_area', 'address', 'state', 'district', 'tehsil', 'crop','crop_images','crop_id','filter_id',
-                  'eng_district']
+                  'eng_district','preference']
     def get_crop_images(self, obj):
         crop_images = CropImages.objects.filter(fk_cropmaster=obj.fk_crops)
         return [image.crop_image.url for image in crop_images]
@@ -87,6 +88,19 @@ class FarmerLandAddressSerializer(serializers.ModelSerializer):
             elif user_language == 2:  
                 return obj.fk_state.hin_state if obj.fk_state.hin_state else None
         return None
+    def get_preference(self, obj):
+        user = obj.fk_farmer
+        crop_id = obj.fk_crops.id
+        filter_type = obj.fk_croptype.id
+        user_language = obj.fk_farmer.fk_language.id
+        print(f"User is :{user}, CropId is :{crop_id}, FilterType is :{filter_type}, UserLanguage is :{user_language},Land is :{obj}")
+        return VegetablePreferenceCompletion.objects.filter(
+            fk_farmer=user,
+            fk_farmland=obj,
+            fk_crop_id=crop_id,
+            fk_language_id=user_language,
+            fk_croptype_id=filter_type
+        ).exists()
 ########################----------------------------Crop Type Serializers------------------###########
 class POPCropTypeSerializer(serializers.ModelSerializer):
     pop_id = serializers.SerializerMethodField()
@@ -143,9 +157,9 @@ class ServiceProviderSerializer(serializers.ModelSerializer):
 
     def get_name(self, obj):
         user_language = self.context.get('user_language')
-        if user_language == "1":  
+        if user_language == 1:  
             return obj.eng_name
-        elif user_language == "2":  
+        elif user_language == 2:  
             return obj.hin_name
         return None
 ##############---------------------------------All States Serializer---------------------###########
