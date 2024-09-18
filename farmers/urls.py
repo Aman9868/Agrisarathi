@@ -56,6 +56,7 @@ urlpatterns = [
     path('GetSingleDiagnosisReport',GetSingleDiagnosisReport.as_view(),name='GetSingleDiagnosisReport'),
     path('GetDiagnosisReport',GetDiagnosisReport.as_view(),name='GetDiagnosisReport'),
     path('GetDiseaseVideos',GetDiseaseVideos.as_view(), name='GetDiseaseVideos'),
+    path('DiseaseOutBreak',DiseaseOutBreak.as_view(), name='DiseaseOutBreak'),
 
     #####################-----------------COMMUNITY------------######################
     path('AddCommunityPost',AddCommunityPost.as_view(), name='AddCommunityPost'),
@@ -94,17 +95,14 @@ urlpatterns = [
     
     #########################---------------DUKANN-------------------------#############
     path('GetallShops',GetallShops.as_view(), name='GetAllShops'),
+    path('GetShopDetails',GetShopDetails.as_view(), name='GetShopDetails'),
+    path('FarmerCommentonShop',FarmerCommentonShop.as_view(),name='FarmerCommentonShop'),
+    path('GetSingleProductDetails',GetSingleProductDetails.as_view(), name='GetSingleProductDetails'),
+    path('GetallProducts',GetallProducts.as_view(), name='GetAllProducts'),
     
 
 
-
-
-
-
-
-
-    ##################---------------------Farmer Rating and Comment on Shop-------------#########
-    path('FarmerCommentonShop',FarmerCommentonShop.as_view(),name='FarmerCommentonShop'),
+    
     #############--------------------------Show all Crop Types----------------#############
     path('CropTypes',CropTypes.as_view(), name='CropTypes')
     # Add more URL patterns here

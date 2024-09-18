@@ -21,6 +21,7 @@ from .serializers import *
 from .models import *
 from .data import *
 from django.db import IntegrityError
+from fponsuppliers.serializers import *
 import random
 import requests
 import json
@@ -600,6 +601,9 @@ class GetDiseaseVideos(APIView):
                 },
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+            
+
+    
 #####################################--------------------Get POP Type-------------------------#############
 class CropTypes(APIView):
     permission_classes = [IsAuthenticated]
@@ -847,44 +851,7 @@ class GetFarmProfileDetails(APIView):
                 },
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
-#############---------------------------------------DUKAAN---------------######################################
-#############---------------------------------------DUKAAN---------------######################################
 
-#################------------------------------------------1.Comment on Shop by Farmer-----------------##############
-class FarmerCommentonShop(APIView):
-    permission_classes = [IsAuthenticated]
-    def post(self, request, format=None):
-        user=request.user
-        print(f"User is {user.user_type}")
-        try:
-            if user.user_type == 'farmer':
-                try:
-                    farmer_profile=FarmerProfile.objects.get(user=user)
-                except FarmerProfile.DoesNotExist:
-                    return Response({'status':'error','message':'Farmer not Found'})
-                shop_id = request.data.get('shop_id', None)
-                comment = request.data.get('comment', None)
-                rating=request.data.get('rating', None)
-                if not shop_id or not comment:
-                    return Response({'status':'error','message':'Shop ID and Comment are required'})
-                data=UserCommentOnShop.objects.create(fk_shop_id=shop_id, fk_user=farmer_profile, comment=comment,
-                                                      ratig=rating)
-                data.save()
-                return Response({'status':'success','message':'Comment added successfully'})
-            else:
-                return Response({'status':'error','message':'Invalid User'})
-        except Exception as e:
-            error_message = str(e)
-            trace = traceback.format_exc()
-            return Response(
-                {
-                    "status": "error",
-                    "message": "An unexpected error occurred",
-                    "error_message": error_message,
-                    "traceback": trace
-                },
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
 ###################---------------------------------COMMUNITY-----------------------------########################
 ###################---------------------------------COMMUNITY-----------------------------########################
 
@@ -1218,6 +1185,44 @@ class CommunityPostsList(APIView):
 
 
 ###########################----------------------------DISEASE DETECTION-------------------------##################
+####################################--------------------Disease Outbreak Notification--------------------------###################
+class DiseaseOutBreak(APIView):
+    permission_classes = [IsAuthenticated]
+    def get(self,request,format=None):
+        user=request.user
+        print(f"User is :{user}")
+        try:
+            if user.user_type=="farmer":
+                try:
+                    farmer_profile = FarmerProfile.objects.get(user=user)
+                    print(f"Farmer profile is :{farmer_profile}")
+                    user_language = farmer_profile.fk_language.id
+                except FarmerProfile.DoesNotExist:
+                    return Response({'status': 'error', 'msg': 'No Farmer Data Found'}, status=status.HTTP_404_NOT_FOUND)
+                try:
+                    farm=FarmerLandAddress.objects.filter(fk_farmer=farmer_profile)
+                except FarmerLandAddress.DoesNotExist:
+                    return Response({'status': 'error', 'msg': 'No Farmer Land Data Found'}, status=status.HTTP_404_NOT_FOUND)
+                serializer = DiseaseOutBreakSerializer(farm, many=True, context={'user_language': user_language, 'current_farmer': farmer_profile})
+                return Response({'status': 'success', 'disease_data': serializer.data}, status=status.HTTP_200_OK)
+            else:
+                return Response({'status': 'error', 'message': 'User type is not farmer'}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            error_message = str(e)
+            trace = traceback.format_exc()
+            print(f"Error: {error_message}")
+            print(f"Traceback: {trace}")
+            return Response(
+                {
+                    "status": "error",
+                    "message": "An unexpected error occurred",
+                    "error_message": error_message,
+                    "traceback": trace
+                },
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+                
+                
 #########---------------------------------------------Disease Detection----------------------------------- ###################
 def process_image(image, model_name):
     pipe = pipeline("image-classification", model=model_name, device='cpu')
@@ -1311,7 +1316,7 @@ class DetectDiseaseAPIView(APIView):
                     disease_translations = DiseaseTranslation.objects.filter(fk_disease__name=disease_name, fk_language=language)
                     if disease_translations.exists():
                         disease_translation = disease_translations.first()
-                        disease_name = disease_translation.translation
+                        disease_name = disease_translation.translation_name
                         obj = DiseaseMaster.objects.filter(name=disease_name, fk_crops__id__in=related_crop_ids[crop_id]).first()
                     else:
                         return Response({'error': f'Disease translation not found for language {user_language}'}, status=status.HTTP_404_NOT_FOUND)
@@ -1323,7 +1328,6 @@ class DetectDiseaseAPIView(APIView):
             if not obj:
                 return Response({'error': 'Disease not found in database'}, status=status.HTTP_404_NOT_FOUND)
 
-            # Serialize disease images and product info
             disease_images_queryset = Disease_Images_Master.objects.filter(fk_disease__id=obj.id)
             disease_images_serialized = DiseaseImagesMasterSerializer(disease_images_queryset, many=True).data
 
@@ -1334,11 +1338,9 @@ class DetectDiseaseAPIView(APIView):
                 filter_type=filter_type,
                 uploaded_image=image,
                 fk_user=farmer_profile,
-                created_dt=datetime.now(),
                 fk_farmer_land_id=fk_farm_id,
                 state=state,
-                district=district,
-                fk_language_id=user_language
+                district=district
             )
 
             disease_images_serialized.insert(0, {'disease_file': upload_disease.uploaded_image.url if upload_disease.uploaded_image else None})
@@ -1409,43 +1411,47 @@ class GetDiseaseVideo(APIView):
 ######################----------------------------------------Get Single Diagnosis Report--------------------##############      
 class GetSingleDiagnosisReport(APIView):
     permission_classes = [IsAuthenticated]
+
     def get(self, request):
-        user=request.user
+        user = request.user
         print(f"User is {user}")
         try:
             diag_id = request.query_params.get('diag_id')
             if not diag_id:
-                return Response({'status': 'error','message': 'Diagnosis report ID is required'}, status=status.HTTP_400_BAD_REQUEST)
+                return Response({'status': 'error', 'message': 'Diagnosis report ID is required'}, status=status.HTTP_400_BAD_REQUEST)
+            
             try:
-                farmer_profile=FarmerProfile.objects.get(user=user)
-                print(f"Farmer profile :{farmer_profile}")
-                user_language=farmer_profile.fk_language.id
-                print(f"Farmer Language is :{user_language}")
+                farmer_profile = FarmerProfile.objects.get(user=user)
+                print(f"Farmer profile: {farmer_profile}")
+                user_language = farmer_profile.fk_language
+                print(f"Farmer Language is: {user_language}")
             except FarmerProfile.DoesNotExist:
-                return Response({'status': 'error','message': 'Farmer profile not found for this user'}, status=status.HTTP_404_NOT_FOUND)
-
+                return Response({'status': 'error', 'message': 'Farmer profile not found for this user'}, status=status.HTTP_404_NOT_FOUND)
+            
             user_disease = Upload_Disease.objects.filter(
-                id=diag_id, fk_user=farmer_profile, fk_language_id=user_language,is_deleted=False
+                id=diag_id, fk_user=farmer_profile, is_deleted=False
             ).select_related("fk_disease", "fk_crop")
-
+            
             if not user_disease.exists():
                 return Response({'status': 'error', 'message': 'Diagnosis report not found'}, status=status.HTTP_404_NOT_FOUND)
-
+            
             first_disease = user_disease.first()
             disease = first_disease.fk_disease.name if first_disease.fk_disease else None
             cropid = first_disease.fk_crop.id if first_disease.fk_crop else None
-            disease_results = UploadDiseaseSerializerMore(user_disease, many=True).data
+            disease_results = UploadDiseaseSerializer(user_disease, many=True, context={'user_language': user_language}).data
             product_disease = DiseaseProductInfo.objects.filter(
                 fk_disease__name=disease,
                 fk_crop_id=cropid
             ).prefetch_related('fk_product')
+            
             product_disease_results = DiseaseProductInfoSerializer(product_disease, many=True).data
-
+            
             return Response({
+                'status': 'success',
                 'disease_results': disease_results,
                 'product_disease_results': product_disease_results
             })
-
+        
         except Exception as e:
             error_message = str(e)
             trace = traceback.format_exc()
@@ -1461,30 +1467,33 @@ class GetSingleDiagnosisReport(APIView):
         
 class GetDiagnosisReport(APIView):
     permission_classes = [IsAuthenticated]
+
     def get(self, request):
-        user=request.user
+        user = request.user
         print(f"User is {user}")
         try:
-            if user.user_type=="farmer":
+            if user.user_type == "farmer":
                 try:
-                    farmer_profile=FarmerProfile.objects.get(user=user)
-                    user_language=farmer_profile.fk_language.id
-                    print(f"Farmer profile :{farmer_profile}")
+                    farmer_profile = FarmerProfile.objects.get(user=user)
+                    user_language = farmer_profile.fk_language.id
+                    print(f"Farmer profile: {farmer_profile}")
                 except FarmerProfile.DoesNotExist:
-                    return Response({'status': 'error','message': 'Farmer profile not found for this user'}, status=status.HTTP_404_NOT_FOUND)
-
+                    return Response({'status': 'error', 'message': 'Farmer profile not found for this user'}, status=status.HTTP_404_NOT_FOUND)
+                
                 user_disease = Upload_Disease.objects.filter(
-                fk_user=farmer_profile,
-                fk_language_id=user_language,
-                is_deleted=False
+                    fk_user=farmer_profile,
+                    is_deleted=False
                 ).order_by('-id')
                 print(f"User Diseases: {user_disease}")
-
-            if not user_disease.exists():
-                return Response({'message': 'Record Not Found'}, status=status.HTTP_404_NOT_FOUND)
-            disease_details = UploadDiseaseSerializer(user_disease, many=True,context={'user_language': user_language}).data
-            return Response({'status': 'success', 'disease_details': disease_details})
-
+                
+                if not user_disease.exists():
+                    return Response({'message': 'Record Not Found'}, status=status.HTTP_404_NOT_FOUND)
+                
+                disease_details = UploadDiseaseSerializer(user_disease, many=True, context={'user_language': user_language}).data
+                return Response({'status': 'success', 'disease_details': disease_details})
+            else:
+                return Response({'status': 'error', 'message': 'Invalid user type'}, status=status.HTTP_403_FORBIDDEN)
+        
         except Exception as e:
             error_message = str(e)
             trace = traceback.format_exc()
@@ -4226,6 +4235,48 @@ class GetFruitsWeatherNotifications(APIView):
                                                                        
         except Exception as e:
             return Response({'message': 'An error occurred', 'error': traceback.format_exc()}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+#############---------------------------------------DUKAAN---------------######################################
+#############---------------------------------------DUKAAN---------------######################################
+
+#################----------------------------SHOP Rating by Farmer-----------------##############
+class FarmerCommentonShop(APIView):
+    permission_classes = [IsAuthenticated]
+    def post(self, request, format=None):
+        user=request.user
+        print(f"User is {user.user_type}")
+        try:
+            if user.user_type == 'farmer':
+                try:
+                    farmer_profile=FarmerProfile.objects.get(user=user)
+                except FarmerProfile.DoesNotExist:
+                    return Response({'status':'error','message':'Farmer not Found'})
+                shop_id = request.data.get('shop_id', None)
+                rating=request.data.get('rating', None)
+                if not shop_id or not rating:
+                    return Response({'status':'error','message':'Shop ID and Rating are required'})
+                if rating < 0 or rating > 5:
+                    return Response({'status':'error','message':'Rating should be between 0 and 5'})
+                print(f"Shop ID IS :{shop_id} Rating by User is :{rating}")
+                data=UserCommentOnShop.objects.create(fk_shop_id=shop_id,fk_user=farmer_profile,
+                                                      rating=rating)
+                print(f"Shop Ratimg Data Object is :{data}")
+                data.save()
+                return Response({'status':'success','message':'Rating added successfully'},status=status.HTTP_200_OK)
+            else:
+                return Response({'status':'error','message':'Invalid User'})
+        except Exception as e:
+            error_message = str(e)
+            trace = traceback.format_exc()
+            return Response(
+                {
+                    "status": "error",
+                    "message": "An unexpected error occurred",
+                    "error_message": error_message,
+                    "traceback": trace
+                },
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 #################-------------------------------------------Agricultural Shops--------------------###########
 class GetallShops(APIView):
     permission_classes = [IsAuthenticated]
@@ -4264,21 +4315,59 @@ class GetallShops(APIView):
                 },
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
-##############################---------------------------- Get Single Shop Info----------------------###############
+##############################----- Get Single Shop Info(with Shop+Product+Shop Ratings)----------------------###############
 class GetShopDetails(APIView):
     permission_classes = [IsAuthenticated]
-    def get(self, request, shop_id):
-        user=request.user
+    def get(self, request, format=None):
+        user = request.user
         print(f"User is :{user.user_type}")
+        shop_id = request.query_params.get('shop_id')
+        filter_type = request.query_params.get('filter_type')
+        
+        if not shop_id:
+            return Response({"error": "shop_id is required"}, status=status.HTTP_400_BAD_REQUEST)
+        if not filter_type:
+            return Response({"error": "filter_type is required"}, status=status.HTTP_400_BAD_REQUEST) 
+        
         try:
-            if user.user_type=="farmer":
-                shop = ShopDetails.objects.get(id=shop_id, is_deleted=False)
-                serializer = ShopDetailSerializer(shop)
-                return Response(serializer.data, status=status.HTTP_200_OK)
+            if user.user_type == "farmer":
+                try:
+                    farmer_profile=FarmerProfile.objects.get(user=user)
+                    print(f"Farmer Record is :{farmer_profile}")
+                except FarmerProfile.DoesNotExist:
+                    return Response({"error": "Farmer not found"}, status=status.HTTP_404_NOT_FOUND)
+                
+                shop = ShopDetails.objects.filter(id=shop_id, is_deleted=False)
+                if not shop.exists():
+                    return Response({"error": "No shop found with this id"}, status=status.HTTP_404_NOT_FOUND)
+
+                shop_instance = shop.first()  
+                if filter_type == "fpo":
+                    fpo_id = shop_instance.fk_fpo.id
+                    print(f"FPO is :{fpo_id}")
+                    products = ProductDetails.objects.filter(fk_fpo_id=fpo_id, is_deleted=False)
+                    print(f"Products are :{products}")
+                    serializer = FPOShopDetailSerializer(shop, many=True,context={'farmer_id':farmer_profile.id})
+                    products_data=FPOProductDetailsSerializer(products,many=True,context={'fpo_id': fpo_id})
+                    print(f"Product Data are :{products_data.data}")
+                    
+                elif filter_type == "supplier":
+                    print(f"Shop is :{shop}")
+                    supplier = shop_instance.fk_supplier.id  
+                    print(f"Supplier is :{supplier}")
+                    products = ProductDetails.objects.filter(fk_supplier__id=supplier, is_deleted=False)
+                    print(f"Products are :{products}")
+                    serializer = SupplierShopDetailSerializer(shop, many=True,context={'farmer_id':farmer_profile.id})
+                    products_data=SupplierProductFilterDetailsSerializer(products, many=True,context={'supplier_id': supplier})
+                
+                return Response({'shops_data': serializer.data,'products_data':products_data.data,
+                                 }, status=status.HTTP_200_OK)
             else:
                 return Response({"error": "Only farmers can access this endpoint"}, status=status.HTTP_403_FORBIDDEN)
+        
         except ShopDetails.DoesNotExist:
             return Response({"error": "No shop found with this id"}, status=status.HTTP_404_NOT_FOUND)
+        
         except Exception as e:
             error_message = str(e)
             trace = traceback.format_exc()
@@ -4291,7 +4380,97 @@ class GetShopDetails(APIView):
                 },
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
-
+#########################-----------------------Get All Products--------------------------################
+class GetallProducts(APIView):
+    permission_classes = [IsAuthenticated]
+    def get(self, request,format=None):
+        user=request.user
+        print(f"User is :{user}")
+        filter_type=request.query_params.get('filter_type')
+        category=request.query_params.get('category')
+        if not filter_type and not category:
+            return Response({"error": "filter_type or category is required"}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            if user.user_type=="farmer":
+                if filter_type == 'fpo':
+                    products = ProductDetails.objects.filter(fk_fpo__isnull=False, is_deleted=False,Category=category)
+                    if not products.exists():
+                        return Response({"error": "No FPO products found"}, status=status.HTTP_404_NOT_FOUND)
+                    product_instance=products.first()
+                    fpo_id=product_instance.fk_fpo.id
+                    print(f"FPO Id is :{fpo_id}")
+                    print(f"Products are :{products}")
+                    products_data=FPOProductDetailsSerializer(products,many=True,context={'fpo_id': fpo_id})
+                    print(f"Product Data are :{products_data.data}")
+                    return Response({'products_data':products_data.data
+                                 }, status=status.HTTP_200_OK)
+                    
+                    
+                elif filter_type =='supplier':
+                    products = ProductDetails.objects.filter(fk_supplier__isnull=False, is_deleted=False,Category=category)
+                    if not products.exists():
+                        return Response({"error": "No Supplier products found"}, status=status.HTTP_404_NOT_FOUND)
+                else:
+                    if category:
+                        products= ProductDetails.objects.filter(is_deleted=False,Category=category)
+                    else:
+                        products = ProductDetails.objects.filter(fk_supplier__isnull=False, is_deleted=False)
+                    if not products.exists():
+                        return Response({"error": "No Supplier products found"}, status=status.HTTP_404_NOT_FOUND)
+                
+            else:
+                return Response({"error": "Only farmers can access this endpoint"}, status=status.HTTP_403_FORBIDDEN)
+        except Exception as e:
+            error_message = str(e)
+            trace = traceback.format_exc()
+            return Response(
+                {
+                    "status": "error",
+                    "message": "An unexpected error occurred",
+                    "error_message": error_message,
+                    "traceback": trace
+                },
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+        
+##############################--------------------GET SINGLE Product Details-----------------------#######################
+class GetSingleProductDetails(APIView):
+    permission_classes = [IsAuthenticated]
+    def get(self, request, format=None):
+        user = request.user
+        print(f"User is :{user.user_type}")
+        product_id = request.query_params.get('product_id')
+        filter_type=request.query_params.get('filter_type')
+        
+        if not product_id :
+            return Response({"error": "product_id is required"}, status=status.HTTP_400_BAD_REQUEST) 
+        if not filter_type:
+            return Response({"error": "filter_type is required"}, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            if user.user_type == "farmer":
+                try:
+                    farmer_profile=FarmerProfile.objects.get(user=user)
+                    print(f"Farmer Record is :{farmer_profile}")
+                except FarmerProfile.DoesNotExist:
+                    return Response({"error": "Farmer not found"}, status=status.HTTP_404_NOT_FOUND)
+                
+                product = ProductDetails.objects.filter(id=product_id,is_deleted=False)
+            else:
+                return Response({"error": "Only farmers can access this endpoint"}, status=status.HTTP_403_FORBIDDEN)
+        except Exception as e:
+            error_message = str(e)
+            trace = traceback.format_exc()
+            return Response(
+                {
+                    "status": "error",
+                    "message": "An unexpected error occurred",
+                    "error_message": error_message,
+                    "traceback": trace
+                },
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+                
 #################################################----------------------SOIL TESTING BOOKINGS------------#########################
 
 #####-------SOIL Testing Shops In Branch/Collection----
@@ -4377,6 +4556,32 @@ class SoilTestingShopPlans(APIView):
             })
 
             return Response({'status':'success','shop_data':shop_data,'soil_charges':soilcharges_data})
+        except Exception as e:
+            error_message = str(e)
+            trace = traceback.format_exc()
+            return Response(
+                {
+                    "status": "error",
+                    "message": "An unexpected error occurred",
+                    "error_message": error_message,
+                    "traceback": trace
+                },
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+            
+##############-------------------------------POP Based Stage Completion Notfication-----------------############
+class PopNotifications(APIView):
+    def get(self, request,format=None):
+        user=request.user
+        print(f"User is :{user.user_type}")
+        try:
+            if user.user_type=='farmer':
+                try:
+                    farmer_profile=FarmerProfile.objects.get(user=user)
+                    print(f"Farmer is :{farmer_profile}")
+                except FarmerProfile.DoesNotExist:
+                    return Response({"error": "No Farmer Profile found"}, status=status.HTTP_404_NOT_FOUND)
+                
         except Exception as e:
             error_message = str(e)
             trace = traceback.format_exc()

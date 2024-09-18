@@ -95,7 +95,7 @@ class Disease_Images_MasterAdmin(admin.ModelAdmin):
 
 @admin.register(DiseaseTranslation)
 class DiseaseTranslationAdmin(admin.ModelAdmin):
-    list_display=('id','getdisease_name','getlanguage','translation','get_combined_crop_name')
+    list_display=('id','getdisease_name','getlanguage','translation_name','get_combined_crop_name')
     def getlanguage(self,obj):
         return obj.fk_language.language if obj.fk_language else None
     getlanguage.short_description='Language'
@@ -246,7 +246,7 @@ class PostsLikeAdmin(admin.ModelAdmin):
 #######################--------------------------------------Upload Diseasees--------------------------#################
 @admin.register(Upload_Disease)
 class Uploaded_DiseaseAdmin(admin.ModelAdmin):
-    list_display = ('id','get_service_provider','get_disease_name','get_user','fk_language','get_combined_crop_name'
+    list_display = ('id','get_service_provider','get_disease_name','get_user','get_combined_crop_name','created_at',
                     )
 
     def get_user(self, obj):
@@ -494,4 +494,10 @@ class PopMapperAdmin(admin.ModelAdmin):
     get_combined_season_name.short_description = 'Combined Season Name'
 
 
-    
+#####################---------------------Shop Ratings-----------------###########
+@admin.register(UserCommentOnShop)
+class ShopRatingsAdmin(admin.ModelAdmin):
+    list_display = ('id', 'get_shop_name', 'rating', 'created_at')
+    def get_shop_name(self, obj):
+        return obj.fk_shop.shopName if obj.fk_shop else None
+    get_shop_name.short_description = 'Shop Name'

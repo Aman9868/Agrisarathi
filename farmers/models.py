@@ -148,7 +148,13 @@ class DiseaseTranslation(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
     fk_language = models.ForeignKey(LanguageSelection, on_delete=models.CASCADE,null=True,blank=True)
     fk_crops=models.ForeignKey(CropMapper,on_delete=models.CASCADE,null=True,blank=True)
-    translation = models.CharField(max_length=255,null=True,blank=True)
+    translation_name = models.CharField(max_length=255,null=True,blank=True)
+    translation_symptom = models.TextField(null=True, blank=True)
+    translation_treatmentbefore = models.TextField(null=True, blank=True)
+    translation_treatmentfield = models.TextField(null=True, blank=True)
+    translation_treatment = models.TextField(null=True, blank=True)
+    translation_message = models.TextField(null=True, blank=True)
+    translation_suggestiveproduct = models.TextField(null=True, blank=True)
 
 class Disease_Images_Master(models.Model):
     fk_disease = models.ManyToManyField(DiseaseMaster,blank=True)
@@ -249,7 +255,6 @@ class FarmerLandAddress(models.Model):
 
 #######################-------------------------------Upload Disease---------------------------#################
 class Upload_Disease(models.Model):
-    created_dt = models.DateTimeField(auto_now_add=False)
     fk_provider=models.ForeignKey(Service_Provider,on_delete=models.CASCADE,null=True,blank=True)
     fk_user=models.ForeignKey(FarmerProfile,on_delete=models.CASCADE,null=True,blank=True)
     fk_crop=models.ForeignKey(CropMapper,on_delete=models.CASCADE,null=True,blank=True)
@@ -261,7 +266,6 @@ class Upload_Disease(models.Model):
     district = models.CharField(max_length=100, null=True, blank=True)
     created_at=models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    fk_language=models.ForeignKey(LanguageSelection,on_delete=models.CASCADE,null=True,blank=True)
     is_deleted = models.BooleanField(default=False)
 
 ###############################----------------------------Disease Product------------------------------#############
@@ -327,11 +331,11 @@ class PostsLike(models.Model):
 class UserCommentOnShop(models.Model):
     fk_shop = models.ForeignKey(ShopDetails, on_delete=models.CASCADE,blank=True,null=True)
     fk_user = models.ForeignKey(FarmerProfile, on_delete=models.CASCADE,blank=True,null=True)
-    comment = models.TextField(null=True, blank=True)
     rating = models.IntegerField(default=0, blank=True, null=True)
     created_at=models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     is_deleted = models.BooleanField(default=False)
+    
 
 #############################-------------------------------Suggested CrOPS--------------------#############
 class SuggestedCrop(models.Model):

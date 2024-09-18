@@ -171,7 +171,7 @@ class FPOProductDetailsSerializer(serializers.ModelSerializer):
             "product_description": obj.productDescription,
             "fk_product_type_id": obj.fk_productype_id,
             "manufacturer_name": obj.manufacturerName,
-            "measurement_type": obj.measurement_type,
+            "measurement_type": obj.measurement_type.description if obj.measurement_type else None,
             "measurement_unit": obj.measurement_unit,
             "quantity": obj.quantity,
             "expiry_date": obj.expiry_date,
