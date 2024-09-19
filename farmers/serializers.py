@@ -561,3 +561,33 @@ class SupplierShopDetailSerializer(serializers.ModelSerializer):
         total_ratings=UserCommentOnShop.objects.filter(fk_shop=obj, is_deleted=False).count()
         print(f"Total Rating on Shop is :{total_ratings}")
         return total_ratings
+    
+    
+##################-------------------------Supplier Product Details Serializers----------------###########
+class SupplierProductAllSerializer(serializers.ModelSerializer):
+    supplier_id = serializers.IntegerField(source='fk_supplier.id', read_only=True)
+    measurement_type=serializers.CharField(source='measurement_type.description', read_only=True)
+    prices = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ProductDetails
+        fields = [
+            'id', 'productName', 'productDescription', 'fk_productype_id', 
+            'manufacturerName', 'measurement_type', 'measurement_unit', 
+            'quantity', 'composition', 'selling_status', 'Category', 
+            'supplier_id', 'prices'
+        ]
+
+    def get_prices(self, obj):
+        supplier_id = self.context['supplier_id']
+        prices = obj.productprices_set.filter(fk_supplier_id=supplier_id)  
+        return [
+            {
+                "price_id": price.id,
+                "purchase_price": price.purchase_price,
+                "unit_price": price.unit_price,
+                "discount": price.discount,
+                "final_price_unit": price.final_price_unit
+            }
+            for price in prices
+        ]

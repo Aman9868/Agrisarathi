@@ -4402,21 +4402,22 @@ class GetallProducts(APIView):
                     print(f"Products are :{products}")
                     products_data=FPOProductDetailsSerializer(products,many=True,context={'fpo_id': fpo_id})
                     print(f"Product Data are :{products_data.data}")
-                    return Response({'products_data':products_data.data
-                                 }, status=status.HTTP_200_OK)
                     
                     
                 elif filter_type =='supplier':
                     products = ProductDetails.objects.filter(fk_supplier__isnull=False, is_deleted=False,Category=category)
                     if not products.exists():
                         return Response({"error": "No Supplier products found"}, status=status.HTTP_404_NOT_FOUND)
-                else:
-                    if category:
-                        products= ProductDetails.objects.filter(is_deleted=False,Category=category)
-                    else:
-                        products = ProductDetails.objects.filter(fk_supplier__isnull=False, is_deleted=False)
-                    if not products.exists():
-                        return Response({"error": "No Supplier products found"}, status=status.HTTP_404_NOT_FOUND)
+                    product_instance=products.first()
+                    supplier_ids = []
+                    for product in products:
+                        supplier_ids.extend([supplier.id for supplier in product.fk_supplier.all()])
+                    print(f"Supplier Ids are :{supplier_ids}")
+                    products_data = SupplierProductFilterDetailsSerializer(products, many=True)
+                    print(f"Product Data are :{products_data.data}")
+                    
+                return Response({'products_data':products_data.data
+                                 }, status=status.HTTP_200_OK)
                 
             else:
                 return Response({"error": "Only farmers can access this endpoint"}, status=status.HTTP_403_FORBIDDEN)
@@ -4454,8 +4455,30 @@ class GetSingleProductDetails(APIView):
                     print(f"Farmer Record is :{farmer_profile}")
                 except FarmerProfile.DoesNotExist:
                     return Response({"error": "Farmer not found"}, status=status.HTTP_404_NOT_FOUND)
-                
-                product = ProductDetails.objects.filter(id=product_id,is_deleted=False)
+                if filter_type=="fpo":
+                    products = ProductDetails.objects.filter(id=product_id,fk_fpo__isnull=False, is_deleted=False)
+                    if not products.exists():
+                        return Response({"error": "No FPO products found"}, status=status.HTTP_404_NOT_FOUND)
+                    product_instance=products.first()
+                    fpo_id=product_instance.fk_fpo.id
+                    print(f"FPO Id is :{fpo_id}")
+                    print(f"Products are :{products}")
+                    products_data=FPOProductDetailsSerializer(products,many=True,context={'fpo_id': fpo_id})
+                    print(f"Product Data are :{products_data.data}")
+                   
+                elif filter_type=="supplier":
+                    products = ProductDetails.objects.filter(id=product_id,fk_supplier__isnull=False, is_deleted=False)
+                    if not products.exists():
+                        return Response({"error": "No Supplier products found"}, status=status.HTTP_404_NOT_FOUND)
+                    product_instance=products.first()
+                    supplier_id=product_instance.fk_supplier.id
+                    print(f"Supplier Id is :{supplier_id}")
+                    print(f"Products are :{products}")
+                    products_data= SupplierProductFilterDetailsSerializer(products, many=True, context={'supplier_id': supplier_id})
+                    print(f"Product Data are :{products_data.data}")
+                return Response({'products_data':products_data.data
+                                 }, status=status.HTTP_200_OK)
+                    
             else:
                 return Response({"error": "Only farmers can access this endpoint"}, status=status.HTTP_403_FORBIDDEN)
         except Exception as e:
